@@ -34,7 +34,11 @@ test("code+diff emits a counted, validated diff and the splice carries it", asyn
     assert.equal(
       section,
       "\n## Hand-off\n\n`src/example.ts` — 1 hunk\n\n" +
-        "```diff\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n```\n",
+        "```diff\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n\n```\n",
+    );
+    assert.ok(
+      blockBody(section!).endsWith("\n"),
+      "the picker payload must keep the patch's newline",
     );
   } finally {
     await remove(repo);
@@ -80,7 +84,7 @@ test("code+full creates a new file block without writing it", async () => {
     assert.match(result.content[0]!.text, /new file, 2 lines/);
 
     const section = await harness.appendHandoff();
-    assert.match(section!, /`new\.txt` — new file, 2 lines\n\n```\nhello\nworld\n```/);
+    assert.match(section!, /`new\.txt` — new file, 2 lines\n\n```\nhello\nworld\n\n```/);
     await assert.rejects(readFile(join(repo, "new.txt"), "utf8"), /ENOENT/);
   } finally {
     await remove(repo);
@@ -100,7 +104,7 @@ test("code+full rewrites an existing file and tags its language", async () => {
     assert.equal(result.isError, undefined);
     const section = await harness.appendHandoff();
     assert.match(section!, /`src\/a\.ts` — full file, 1 line/);
-    assert.match(section!, /```ts\nnew\n```/);
+    assert.match(section!, /```ts\nnew\n\n```/);
   } finally {
     await remove(repo);
   }
@@ -118,7 +122,7 @@ test("command blocks are syntax-checked and captioned by purpose", async () => {
     assert.equal(result.isError, undefined);
     assert.match(result.content[0]!.text, /bash -n passed/);
     const section = await harness.appendHandoff();
-    assert.match(section!, /`say hi` — command\n\n```bash\necho hi\n```/);
+    assert.match(section!, /`say hi` — command\n\n```bash\necho hi\n\n```/);
   } finally {
     await remove(repo);
   }
@@ -154,7 +158,7 @@ test("fence length grows past backticks in a full block", async () => {
     });
     assert.equal(result.isError, undefined);
     const section = await harness.appendHandoff();
-    assert.match(section!, /\n````md\nbefore\n```\ninside\n```\nafter\n````\n$/);
+    assert.match(section!, /\n````md\nbefore\n```\ninside\n```\nafter\n\n````\n$/);
   } finally {
     await remove(repo);
   }
@@ -557,6 +561,25 @@ test("a multi-file patch is refused", async () => {
     });
     assert.equal(result.isError, true);
     assert.match(result.content[0]!.text, /more than one file/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("an empty full file yields an empty picker payload", async () => {
+  const repo = await makeRepo();
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "empty.txt",
+      form: "full",
+      content: "",
+    });
+    assert.equal(result.isError, undefined);
+    const section = await harness.appendHandoff();
+    assert.match(section!, /`empty\.txt` — new file, 0 lines\n\n```\n```/);
+    assert.equal(blockBody(section!), "");
   } finally {
     await remove(repo);
   }

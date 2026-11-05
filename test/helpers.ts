@@ -129,13 +129,13 @@ export function loadExtension(directory: string): Harness {
   };
 }
 
-/** Extract a block body between its fences, as the picker would. */
+/** Extract a block body between its fences, as pi-clip's picker does. */
 export function blockBody(section: string): string {
-  const start = /^(`{3,})[^\n]*\n/m.exec(section);
-  if (!start) throw new Error(`no fenced block in:\n${section}`);
-  const fence = start[1]!;
-  const rest = section.slice(start.index + start[0].length);
-  const end = new RegExp(`^${fence}$`, "m").exec(rest);
-  if (!end) throw new Error(`unterminated fenced block in:\n${section}`);
-  return rest.slice(0, end.index);
+  const lines = section.split("\n");
+  const start = lines.findIndex((line) => /^`{3,}/.test(line));
+  if (start < 0) throw new Error(`no fenced block in:\n${section}`);
+  const fence = /^(`{3,})/.exec(lines[start]!)?.[1]!;
+  const end = lines.findIndex((line, index) => index > start && line.startsWith(fence));
+  if (end < 0) throw new Error(`unterminated fenced block in:\n${section}`);
+  return lines.slice(start + 1, end).join("\n");
 }

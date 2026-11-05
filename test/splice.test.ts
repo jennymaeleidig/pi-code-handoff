@@ -138,6 +138,10 @@ test("the real pi binary persists the spliced hand-off section", { timeout: 120_
     );
     assert.match(blocks[0]!.body, /a\.txt/);
     assert.match(blocks[1]!.body, /b\.txt/);
+    assert.ok(
+      blocks[0]!.body.endsWith("\n"),
+      "the picker payload must be a newline-terminated patch",
+    );
 
     const aCaptions = text.match(/`a\.txt`/g) ?? [];
     const bCaptions = text.match(/`b\.txt`/g) ?? [];
