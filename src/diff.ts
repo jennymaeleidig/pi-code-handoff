@@ -39,12 +39,12 @@ export function joinText(lines: string[], endsWithNewline: boolean): string {
 }
 
 /**
- * Myers diff. The search is abandoned past `limit` edits, where the two sides
- * are treated as wholly different: a valid, if noisier, patch is still a
- * truthful one, and the alternative is quadratic memory on a whole-file
- * rewrite that `form: "full"` should have been used for.
+ * Myers diff. The search is abandoned past `limit` edits, because its memory
+ * is quadratic in the edit distance. A change that large should be handed off
+ * with `form: "full"`, so refusing beats silently degrading the patch into a
+ * whole-file replacement.
  */
-function myers(oldLines: string[], newLines: string[]): RawEdit[] {
+function myers(oldLines: string[], newLines: string[]): RawEdit[] | undefined {
   const n = oldLines.length;
   const m = newLines.length;
   const max = n + m;
@@ -78,12 +78,7 @@ function myers(oldLines: string[], newLines: string[]): RawEdit[] {
     if (found) break;
   }
 
-  if (!found) {
-    return [
-      ...oldLines.map((text) => ({ kind: "-" as const, text })),
-      ...newLines.map((text) => ({ kind: "+" as const, text })),
-    ];
-  }
+  if (!found) return undefined;
 
   const reversed: { kind: EditKind; text: string }[] = [];
   let x = n;
@@ -160,7 +155,7 @@ function groupHunks(edits: Edit[], context: number): Hunk[] {
   }));
 }
 
-function range(start: number, count: number): string {
+function formatRange(start: number, count: number): string {
   return count === 1 ? `${start}` : `${start},${count}`;
 }
 
@@ -168,11 +163,18 @@ function range(start: number, count: number): string {
  * Render a canonical unified diff for one file. Returns an empty string when
  * the two texts are identical.
  */
-export function unifiedDiff(path: string, oldText: string, newText: string, context = 3): string {
+export function unifiedDiff(path: string, oldText: string, newText: string): string {
   const oldSide = splitText(oldText);
   const newSide = splitText(newText);
-  const edits = annotate(myers(oldSide.lines, newSide.lines));
-  const hunks = groupHunks(edits, context);
+  const raw = myers(oldSide.lines, newSide.lines);
+  if (raw === undefined) {
+    throw new Error(
+      `The change to "${path}" is too large to diff reliably in this call. ` +
+        'Use form "full" with the whole new file, or split the change.',
+    );
+  }
+  const edits = annotate(raw);
+  const hunks = groupHunks(edits, 3);
   if (hunks.length === 0) return "";
 
   const output = [`--- a/${path}`, `+++ b/${path}`];
@@ -184,7 +186,7 @@ export function unifiedDiff(path: string, oldText: string, newText: string, cont
     const first = lines[0]!;
     const oldStart = oldCount === 0 ? first.oldLine - 1 : first.oldLine;
     const newStart = newCount === 0 ? first.newLine - 1 : first.newLine;
-    output.push(`@@ -${range(oldStart, oldCount)} +${range(newStart, newCount)} @@`);
+    output.push(`@@ -${formatRange(oldStart, oldCount)} +${formatRange(newStart, newCount)} @@`);
 
     for (const line of lines) {
       output.push(`${line.kind}${line.text}`);

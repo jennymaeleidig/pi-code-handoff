@@ -7,15 +7,16 @@ import { type Static, Type } from "typebox";
 import { countDiff, splitText, unifiedDiff } from "./diff.ts";
 import { checkCommand, checkPatch, repositoryRoot } from "./git.ts";
 import {
-  applyReplacements,
+  APPENDED_NOTE,
   commandCaption,
   diffCaption,
   fullCaption,
   languageFor,
+  plural,
   renderSection,
   type HandoffBlock,
-  type Replacement,
 } from "./handoff.ts";
+import { applyReplacements, type Replacement } from "./replace.ts";
 import { applyHunks, parsePatch } from "./patch.ts";
 
 const schema = Type.Object({
@@ -89,6 +90,9 @@ async function buildBlock(
     rejectPresent(params, ["path", "form", "replacements", "content", "patch"]);
     const command = requireText(params.command, "command", "command");
     const purpose = requireText(params.purpose, "purpose", "command");
+    if (purpose.includes("\n")) {
+      throw new Error('"purpose" must be a single line; it is the block\'s caption.');
+    }
     await checkCommand(command);
     return {
       block: {
@@ -99,7 +103,7 @@ async function buildBlock(
         lang: "bash",
         caption: commandCaption(purpose),
       },
-      verdict: `Validated command "${purpose}": bash -n passed. The command block is appended to your reply; do not write it yourself.`,
+      verdict: `Validated command "${purpose}": bash -n passed. ${APPENDED_NOTE}`,
     };
   }
 
@@ -156,6 +160,13 @@ async function buildCodeBlock(
       );
     }
     const content = params.content ?? "";
+    if (content !== "" && !content.endsWith("\n")) {
+      throw new Error(
+        'form "full" content must end with a newline (an empty file is the one exception), ' +
+          'because a fenced Markdown body cannot hold a final line without one. Use form "diff" ' +
+          "or a /dev/null patch to preserve a missing trailing newline.",
+      );
+    }
     const lines = splitText(content).lines.length;
     return {
       block: {
@@ -168,8 +179,8 @@ async function buildCodeBlock(
         caption: fullCaption(path, !exists, lines),
       },
       verdict:
-        `Validated ${path}: ${exists ? "full file" : "new file"}, ${lines} line${lines === 1 ? "" : "s"}. ` +
-        `The full-file block is appended to your reply; do not write it yourself.`,
+        `Validated ${path}: ${exists ? "full file" : "new file"}, ${plural(lines, "line")}. ` +
+        APPENDED_NOTE,
     };
   }
 
@@ -185,6 +196,17 @@ async function buildCodeBlock(
         "Deleting a file with a patch is not supported; hand off the new content instead.",
       );
     }
+    for (const [header, name] of [
+      [parsed.oldPath, "---"],
+      [parsed.newPath, "+++"],
+    ] as const) {
+      if (typeof header === "string" && header !== path) {
+        throw new Error(
+          `The patch's ${name} header names "${header}", but path is "${path}". ` +
+            "One block carries one file; make them agree.",
+        );
+      }
+    }
     const creates = parsed.oldPath === null;
     if (creates && exists) {
       throw new Error(`The patch creates "${path}", but the file already exists.`);
@@ -194,7 +216,7 @@ async function buildCodeBlock(
         `"${path}" does not exist. Use form "full" to create it, or a /dev/null patch.`,
       );
     }
-    oldText = creates ? "" : await readText(absolute);
+    oldText = creates ? "" : await readFile(absolute, "utf8");
     const newText = applyHunks(oldText, parsed.hunks);
     if (newText === oldText) throw new Error(`The patch leaves "${path}" unchanged.`);
     return await diffResult(toolCallId, path, oldText, newText, root);
@@ -203,7 +225,7 @@ async function buildCodeBlock(
   if (!exists) {
     throw new Error(`"${path}" does not exist. Use form "full" with "content" to create it.`);
   }
-  oldText = await readText(absolute);
+  oldText = await readFile(absolute, "utf8");
 
   if (params.replacements !== undefined) {
     if (params.replacements.length === 0) {
@@ -221,10 +243,6 @@ async function buildCodeBlock(
   const content = params.content ?? "";
   if (content === oldText) throw new Error(`The new content leaves "${path}" unchanged.`);
   return await diffResult(toolCallId, path, oldText, content, root);
-}
-
-async function readText(path: string): Promise<string> {
-  return readFile(path, "utf8");
 }
 
 async function diffResult(
@@ -249,10 +267,9 @@ async function diffResult(
       caption: diffCaption(path, counts.hunks),
     },
     verdict:
-      `Validated ${path}: ${counts.hunks} hunk${counts.hunks === 1 ? "" : "s"}, ` +
-      `${counts.insertions} insertion${counts.insertions === 1 ? "" : "s"}, ` +
-      `${counts.deletions} deletion${counts.deletions === 1 ? "" : "s"}. ` +
-      `git apply --check passed. The block is appended to your reply; do not write it yourself.`,
+      `Validated ${path}: ${plural(counts.hunks, "hunk")}, ` +
+      `${plural(counts.insertions, "insertion")}, ${plural(counts.deletions, "deletion")}. ` +
+      `git apply --check passed. ${APPENDED_NOTE}`,
   };
 }
 
@@ -325,7 +342,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     label: "Copy Paste",
     description:
       "Validate a change, then append a copyable hand-off block to your reply. " +
-      "Never write the block yourself: the harness appends it after validation, and a second copy is unvalidated. " +
+      `${APPENDED_NOTE} ` +
       'For kind "code", pass a repo-relative or absolute path and exactly one of: "replacements" ' +
       '(search/replace pairs, each matching the file exactly once), "content" (the whole file; form "full" ' +
       'emits it entire, form "diff" diffs it against the file on disk), ' +
@@ -335,9 +352,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       "The target must be inside a git repository. On failure the applier's own error comes back so you can repair in this turn. " +
       "One block per path per reply.",
     promptSnippet: "Validate a change and append a copyable hand-off block",
-    promptGuidelines: [
-      "Use copy_paste to hand off code or shell commands; never write a hand-off block yourself, because copy_paste appends the validated block to the reply.",
-    ],
+    promptGuidelines: [`Use copy_paste to hand off code or shell commands. ${APPENDED_NOTE}`],
     parameters: schema,
     async execute(
       toolCallId: string,

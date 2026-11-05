@@ -66,7 +66,7 @@ export async function repositoryRoot(target: string): Promise<string> {
 export async function checkPatch(root: string, patch: string): Promise<void> {
   const result = await run("git", ["apply", "--check", "-p1"], root, patch);
   if (result.code !== 0) {
-    throw new Error(`git apply --check rejected the block:\n${result.stderr.trim()}`);
+    throw new Error(result.stderr.trimEnd() || "git apply --check rejected the block.");
   }
 }
 

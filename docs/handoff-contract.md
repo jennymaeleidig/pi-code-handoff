@@ -17,7 +17,10 @@ A `diff` block:
   right one. A block built from an escape hatch patch is recounted and re-headed by that same
   path before it is checked.
 
-A `full` code block is the entire file, so it applies by being saved over the target.
+A `full` code block is the entire file, so it applies by being saved over the target. Its
+content ends with a newline (an empty file is the one exception), because a fenced Markdown
+body cannot carry a final line without one; a file whose last line has no newline is handed
+off as a `diff` instead.
 
 A `command` block passes `bash -n`.
 
@@ -42,8 +45,8 @@ which block to paste, and the caption above it says what it is.
 
 ## Boundaries
 
-The extension never writes to the target repository, never applies a patch, and never picks a
-repository — it only refuses to emit a block it could not validate. (A `command` block is
+The extension never writes to the target repository, never applies a patch, and never chooses
+a checkout — it only refuses to emit a block it could not validate. (A `command` block is
 syntax-checked through a temporary file outside the repository, which is validation, not a
 change.) Whether a block was applied, and to which checkout, is the applier's business.
 

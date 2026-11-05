@@ -7,7 +7,7 @@ import { makeDirectory, makeRepo, remove, git, loadExtension, blockBody } from "
 test("registers copy_paste and a message_end handler", () => {
   const harness = loadExtension("/tmp");
   assert.equal(harness.tool.name, "copy_paste");
-  assert.match(harness.tool.description, /never write the block yourself/i);
+  assert.match(harness.tool.description, /do not write it yourself/i);
   assert.ok(harness.tool.promptGuidelines?.some((rule) => rule.includes("copy_paste")));
 });
 
@@ -474,6 +474,89 @@ test("two separated edits produce two hunks that still apply", async () => {
       await readFile(join(repo, "src/a.ts"), "utf8"),
       original.replace("line 1\n", "LINE 1\n").replace("line 12\n", "LINE 12\n"),
     );
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("overlapping matches count as more than one", async () => {
+  const repo = await makeRepo({ "src/a.ts": "aaa\n" });
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "src/a.ts",
+      replacements: [{ search: "aa", replace: "b" }],
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /matches 2 times/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("full content without a trailing newline is refused", async () => {
+  const repo = await makeRepo();
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "new.txt",
+      form: "full",
+      content: "no newline",
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /must end with a newline/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("a command purpose must be one line", async () => {
+  const repo = await makeRepo();
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "command",
+      command: "echo hi",
+      purpose: "two\nlines",
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /must be a single line/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("a patch naming a different file is refused", async () => {
+  const repo = await makeRepo({ "src/a.ts": "one\n" });
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "src/a.ts",
+      patch: "--- a/src/other.ts\n+++ b/src/other.ts\n@@ -1 +1 @@\n-one\n+ONE\n",
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /names "src\/other\.ts"/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("a multi-file patch is refused", async () => {
+  const repo = await makeRepo({ "a.ts": "one\n", "b.ts": "two\n" });
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "a.ts",
+      patch:
+        "--- a/a.ts\n+++ b/a.ts\n@@ -1 +1 @@\n-one\n+ONE\n" +
+        "diff --git a/b.ts b/b.ts\n--- a/b.ts\n+++ b/b.ts\n@@ -1 +1 @@\n-two\n+TWO\n",
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /more than one file/);
   } finally {
     await remove(repo);
   }

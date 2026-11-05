@@ -2,7 +2,7 @@
 
 Turns a proposed change into a validated, copyable artifact — a hand-off block — and puts it
 in the assistant's reply, where a picker can reach it and an applier can consume it. The
-extension never writes to disk.
+extension never writes to the target repository.
 
 ## Language
 

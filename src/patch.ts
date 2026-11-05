@@ -39,6 +39,12 @@ export function parsePatch(patch: string): ParsedPatch {
   let last: ParsedLine | undefined;
 
   for (const line of lines) {
+    if (line.startsWith("diff --git ")) {
+      if (hunks.length > 0) {
+        throw new Error("The patch changes more than one file; one block carries one file.");
+      }
+      continue;
+    }
     if (!current && line.startsWith("--- ")) {
       oldPath = pathFromHeader(line.slice(4));
       continue;
@@ -49,9 +55,12 @@ export function parsePatch(patch: string): ParsedPatch {
     }
     if (
       !current &&
-      (line.startsWith("diff --git ") ||
-        line.startsWith("index ") ||
-        line.startsWith("new file mode "))
+      (line.startsWith("index ") ||
+        line.startsWith("new file mode ") ||
+        line.startsWith("deleted file mode ") ||
+        line.startsWith("similarity index ") ||
+        line.startsWith("rename from ") ||
+        line.startsWith("rename to "))
     ) {
       continue;
     }
@@ -116,6 +125,9 @@ export function applyHunks(oldText: string, hunks: ParsedHunk[]): string {
   let lastNewLineHasNoNewline = false;
 
   for (const hunk of hunks) {
+    // A hunk with no context or deletion inserts at `oldStart` (git writes
+    // `-N,0` meaning "after line N"); otherwise its first old-side line is
+    // 1-based line `oldStart`.
     const index = hunk.lines.some((line) => line.kind !== "+") ? hunk.oldStart - 1 : hunk.oldStart;
     if (index < cursor) {
       throw new Error(`patch hunk at old line ${hunk.oldStart} overlaps an earlier hunk`);
