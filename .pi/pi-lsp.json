@@ -1,0 +1,19 @@
+{
+  "timeout": 30000,
+  "servers": {
+    "typescript": {
+      "command": ["typescript-language-server", "--stdio"],
+      "extensions": [".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs"],
+      "diagnosticsSettleMs": 1500
+    },
+    "json": {
+      "command": ["vscode-json-language-server", "--stdio"],
+      "extensions": [".json", ".jsonc"]
+    },
+    "markdown": {
+      "command": ["marksman", "server"],
+      "extensions": [".md"],
+      "pushDiagnosticsGraceMs": 3000
+    }
+  }
+}

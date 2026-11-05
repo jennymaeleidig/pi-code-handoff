@@ -1,0 +1,5 @@
+[tools]
+node = "22"
+
+[env]
+# Editor/LSP binaries come from the global mise config; nothing here shadows them.
