@@ -42,9 +42,10 @@ which block to paste, and the caption above it says what it is.
 
 ## Boundaries
 
-The extension never writes to disk, never applies a patch, and never picks a repository — it
-only refuses to emit a block it could not validate. Whether a block was applied, and to which
-checkout, is the applier's business.
+The extension never writes to the target repository, never applies a patch, and never picks a
+repository — it only refuses to emit a block it could not validate. (A `command` block is
+syntax-checked through a temporary file outside the repository, which is validation, not a
+change.) Whether a block was applied, and to which checkout, is the applier's business.
 
 A block is true against the working tree at the moment it was produced. Staleness is only
 detected where the diff overlaps it: an intervening edit to a diffed line or to its context
