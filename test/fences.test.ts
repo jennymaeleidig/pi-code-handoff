@@ -67,8 +67,9 @@ test("a close longer than its opener closes the block", () => {
 });
 
 test("fences indented by up to three spaces count; four do not", () => {
-  const indented = scanFencedBlocks("  ```js\n  one\n   ```\n");
-  assert.deepEqual(indented, [{ lang: "js", body: "  one", terminated: true }]);
+  // The opener's indentation comes off each body line, but only that much.
+  const indented = scanFencedBlocks("  ```js\n  one\n    two\nnot three\n   ```\n");
+  assert.deepEqual(indented, [{ lang: "js", body: "one\n  two\nnot three", terminated: true }]);
 
   const tooDeep = scanFencedBlocks("    ```js\n    one\n    ```\n");
   assert.deepEqual(tooDeep, []);
