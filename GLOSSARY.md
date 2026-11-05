@@ -58,8 +58,20 @@ dotfiles; this package only promises what it receives.
 _Avoid_: Consumer, patcher, DiffApply
 
 **Picker**:
-`pi-clip`'s block selector, the copy path that reaches a hand-off block from inside pi.
+`/copy-paste`'s overlay, the copy path that reaches a block from inside pi: a hand-off tab
+listing this reply's validated blocks, and a parsed tab listing the reply's own markdown
+blocks.
 _Avoid_: Clip, copy menu
+
+**Hand-off tab**:
+The picker's default tab: this reply's hand-off blocks by caption, each copied as its bare
+body.
+_Avoid_: Block list, picker list
+
+**Parsed tab**:
+The picker's second tab: the reply's own fenced code, tables, lists and blockquotes, read
+back out of the message text. The fallback when the hand-off tab has nothing.
+_Avoid_: Raw view, fallback tab
 
 **Fence length**:
 How many backticks a block's fence carries — a property of the block's content, not a house

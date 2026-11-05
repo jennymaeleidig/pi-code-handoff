@@ -81,9 +81,10 @@ export function fenceLength(body: string): number {
 
 export function renderBlock(block: HandoffBlock): string {
   const fence = "`".repeat(fenceLength(block.body));
-  // The picker joins the lines between fences without a final newline. Leave
-  // one empty line before the closing fence so its payload keeps the body's
-  // trailing newline; a patch without one is "corrupt patch" to git.
+  // A fenced body cannot otherwise carry a final newline, so leave one empty
+  // line before the closing fence: a reader that strips the fences gets the
+  // body's trailing newline back, and a patch without one is "corrupt patch"
+  // to git.
   const body =
     block.body === "" ? "" : `${block.body.endsWith("\n") ? block.body : `${block.body}\n`}\n`;
   return `${block.caption}\n\n${fence}${block.lang}\n${body}${fence}`;

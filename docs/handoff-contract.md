@@ -29,14 +29,17 @@ A `command` block passes `bash -n`.
 Every hand-off block is fenced, and its fence is longer than any run of backticks inside it,
 so a full-file block that contains fences of its own cannot terminate early. The length is
 computed from the content rather than written by hand. A non-empty block leaves one empty
-line before the closing fence, so a picker that joins the lines between fences still hands
-over a body with its trailing newline — a patch without one is `corrupt patch` to git.
+line before the closing fence, because a fenced body cannot otherwise carry a final newline:
+a reader that strips the fences gets the body's trailing newline back, and a patch that lost
+one is `corrupt patch` to git.
 
 ## Two copy paths
 
-- **Picker path** (`pi-clip`): the block body arrives with the fences stripped, so a `diff`
-  block's clipboard payload is a bare patch and needs no fence handling at all. The empty line
-  before the closing fence is what preserves the payload's final newline.
+- **Picker path** (`/copy-paste`, not yet shipped): the hand-off tab copies the block the
+  extension validated rather than re-reading rendered markdown, so a `diff` block's clipboard
+  payload is a bare patch and needs no fence handling at all. That promise covers the hand-off
+  tab alone: the picker's parsed tab reads markdown back out of the message text and promises
+  no more than the message contains.
 - **Whole-reply path** (`/copy`, `Ctrl+X`): the fences come along, so strip one leading fence
   together with the tag that follows it, and the trailing run, which is at least as long as
   the leading one.

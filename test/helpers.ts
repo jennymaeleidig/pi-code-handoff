@@ -129,7 +129,7 @@ export function loadExtension(directory: string): Harness {
   };
 }
 
-/** Extract a block body between its fences, as pi-clip's picker does. */
+/** Extract a block body between its fences, as the whole-reply path's applier does. */
 export function blockBody(section: string): string {
   const lines = section.split("\n");
   const start = lines.findIndex((line) => /^`{3,}/.test(line));
