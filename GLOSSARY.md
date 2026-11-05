@@ -11,57 +11,57 @@ One fenced artifact in an assistant reply that a human copies out and applies ou
 _Avoid_: Snippet, patch output, copy block
 
 **Hand-off section**:
-The `## Hand-off` heading plus every block spliced into one assistant message, in tool-call
-order. Absent when a turn produced no blocks.
+The heading plus every block placed in one assistant message, in tool-call order. Absent when
+a turn produced no blocks.
 _Avoid_: Footer, appendix, block dump
 
 **Caption**:
-The single line between the hand-off heading and a block's fence, naming the path the block
-touches or the purpose of the command it carries.
+The one line immediately above a block's fence, naming the path the block touches or the
+purpose of the command it carries. Every block has its own.
 _Avoid_: Title, label, header
 
 **Splice**:
-The `message_end` rewrite that places the hand-off section into the finalized assistant
-message, so the validated bytes and the pickable bytes are one object.
+Placing a hand-off block into the assistant message itself, so the bytes validated and the
+bytes picked are one object.
 _Avoid_: Append, inject, patch message
 
 **Kind**:
-What a block carries: code or command. It selects the validator.
-_Avoid_: Type, mode
+What a block carries: code or command.
+_Avoid_: Type, category
 
 **Form**:
-For `code`, whether the block carries hunks (`diff`) or the file entire (`full`).
+For code, whether a block carries hunks (`diff`) or the file entire (`full`).
 _Avoid_: Format, shape, mode
 
 **Replacement**:
-One search/replacement pair supplied for a `diff` block. It must match exactly once.
+One search/replacement pair supplied for a `diff` block, which must match exactly once.
 _Avoid_: Edit, patch hunk, search-replace
 
 **Escape hatch patch**:
-Raw unified-diff hunks written by the model itself, for a change replacements cannot express.
-Validated identically to a generated one.
+Raw unified-diff hunks written by the model for a change replacements cannot express,
+validated like any other block.
 _Avoid_: Raw diff, manual patch, fallback
 
 **Verdict**:
-The tool's short result: counts, and the applier's answer. Never the block.
+The tool's short answer: what the call produced, and whether validation passed. Never the
+block.
 _Avoid_: Result, output, summary
 
 **Contract**:
-The guarantee every block satisfies — repo-relative `a/`/`b/` paths, and `git apply --check`
-passes against the working tree as it stands.
+`docs/handoff-contract.md`, the standing statement of what every block guarantees; a block
+meets the contract when those guarantees hold.
 _Avoid_: Spec, format rules
 
 **Applier**:
-The command outside pi that consumes a block from the clipboard. Lives in the user's
-dotfiles; this package only guarantees what it receives.
+The command outside pi that consumes a block from the clipboard. It lives in the author's
+dotfiles; this package only promises what it receives.
 _Avoid_: Consumer, patcher, DiffApply
 
 **Picker**:
-`pi-clip`'s block selector, the only path reaching a hand-off block. It reads assistant
-messages, never tool results.
+`pi-clip`'s block selector, the copy path that reaches a hand-off block from inside pi.
 _Avoid_: Clip, copy menu
 
 **Fence length**:
-The number of backticks in a block's fence: the longest run of backticks inside the block,
-plus one, never fewer than three.
+How many backticks a block's fence carries — a property of the block's content, not a house
+style.
 _Avoid_: Fence, delimiter, backtick count
