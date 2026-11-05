@@ -12,8 +12,10 @@ A `diff` block:
 - passes `git apply --check -p1` from that repository's root, against the working tree as it
   stands;
 - has three lines of context where the file provides them;
-- has hunk headers whose counts are correct, because code counted them. A block built from an
-  escape hatch patch is recounted and re-headed by that same path before it is checked.
+- has hunk headers whose counts are correct, because code counted them. That is a promise to
+  the reader rather than a condition git checks, since it applies a wrong count as readily as a
+  right one. A block built from an escape hatch patch is recounted and re-headed by that same
+  path before it is checked.
 
 A `full` code block is the entire file, so it applies by being saved over the target.
 
@@ -44,6 +46,7 @@ The extension never writes to disk, never applies a patch, and never picks a rep
 only refuses to emit a block it could not validate. Whether a block was applied, and to which
 checkout, is the applier's business.
 
-A block is true against the working tree at the moment it was produced, so a block produced
-before an intervening edit is stale: applying it is expected to fail rather than to merge. One
-block per path per reply.
+A block is true against the working tree at the moment it was produced. Staleness is only
+detected where the diff overlaps it: an intervening edit to a diffed line or to its context
+makes the block fail, while an edit elsewhere leaves it applying cleanly and possibly losing
+what the second edit added. One block per path per reply.
