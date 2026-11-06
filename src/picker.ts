@@ -18,7 +18,7 @@ export interface PickerItem {
   label: string;
   /** The exact text `enter` puts on the clipboard. */
   body: string;
-  /** A short kind tag for the list, when the label does not already say it. */
+  /** The bytes live in the block, not in this tag; the tag only names them for the list. */
   badge?: string;
 }
 
@@ -43,7 +43,7 @@ export function handoffItems(blocks: readonly HandoffBlock[]): PickerItem[] {
   }));
 }
 
-/** The parsed tab: the reply's own markdown blocks, copied as raw markdown. */
+/** The Agent reply tab: the reply's own markdown blocks, copied as raw markdown. */
 export function parsedItems(text: string): PickerItem[] {
   return parseMarkdownBlocks(text).map((block) => ({ label: block.label, body: block.body }));
 }

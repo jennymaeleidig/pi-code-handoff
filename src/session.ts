@@ -6,7 +6,7 @@
  * that entry to the message it belongs to: a custom entry from an older reply
  * must not feed the picker for a newer one, so the match is on the assistant
  * message's timestamp. When nothing matches, the caller falls back to the
- * parsed tab.
+ * Agent reply tab.
  */
 
 import type { HandoffBlock } from "./handoff.ts";
@@ -126,7 +126,7 @@ export function storedBlocks(
 /**
  * The blocks for a reply: this session's memory first — byte-identical to what
  * validation accepted — then the entry written to the session (a `/reload` or
- * a resume), then nothing, so the parsed tab takes over.
+ * a resume), then nothing, so the Agent reply tab takes over.
  */
 export function replyBlocks(
   entries: readonly SessionEntryLike[],

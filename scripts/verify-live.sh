@@ -280,7 +280,7 @@ ENV_FILE="$STATE/state.env"
 REPORT="$REPO/docs/verification/live-$(date +%Y-%m-%d-%H%M%S).md"
 mkdir -p "$STATE"
 
-banner "Live verification: a hand-off block through a real applier"
+banner "Live verification: a hand-off block from reply to clipboard"
 
 # A version string, or "not on PATH", so each tool is looked up once.
 version_of() {
@@ -346,7 +346,8 @@ pause
 
 stage "Install it and hand off the change"
 say "In a second terminal or pane, install the package into the scratch repo"
-say "and start a real session on it:"
+say "and start a real session on it. A fresh project asks for trust first; grant it,"
+say "because nothing loads until it does:"
 step "cd \"$SCRATCH\" && pi install --local \"$REPO\""
 step "pi"
 say "Then send the request in $STATE/prompt.txt (print it with: cat $STATE/prompt.txt):"
@@ -359,8 +360,7 @@ step "one for src/index.ts, fenced ts, caption 'new file, N lines'"
 step "each block sits under one copy_paste tool call above the reply"
 note "Leave pi running; the next stages use that session."
 pause "Press Enter once the blocks are in the reply"
-previous=$( _existing HANDOFF_OK || true )
-HANDOFF_OK=$(ask_yes_no "Were both blocks there, each from one copy_paste call?" "$previous")
+HANDOFF_OK=$(ask_yes_no "Were both blocks there, each from one copy_paste call?")
 write_env HANDOFF_OK "$HANDOFF_OK"
 
 stage "Pick the diff with the picker"
@@ -368,6 +368,7 @@ say "In the pi session, on that same reply:"
 step "press Ctrl+Shift+C, or run /copy-paste"
 step "the overlay should open on the Hand-off tab, its items labelled by caption"
 step "choose the src/greeting.ts item and press enter"
+step "press 2 for the Agent reply tab, check it lists the reply's own blocks, then 1"
 step "watch for the 'Copied ...' notice"
 printf '' | clip_write 2>/dev/null ||
   warn "could not clear the clipboard; an older payload could still pass the check"
@@ -459,11 +460,10 @@ write_env WHOLE_REPLY_OK "$WHOLE_REPLY_OK"
 stage "Reflow"
 say "The splice replaces the reply's text at the end of the turn, so watch the screen"
 say "as the hand-off section appears: does the view jump, scroll, duplicate a block,"
-say "or repaint half a screen?"
+say "or redraw half a screen?"
 note "If you missed it, send another small change request and watch that turn."
 ask REFLOW "One line on what you saw:"
-previous=$( _existing REFLOW_ACCEPTABLE || true )
-REFLOW_ACCEPTABLE=$(ask_yes_no "Was the reflow acceptable?" "$previous")
+REFLOW_ACCEPTABLE=$(ask_yes_no "Was the reflow acceptable?")
 write_env REFLOW "$REFLOW"
 write_env REFLOW_ACCEPTABLE "$REFLOW_ACCEPTABLE"
 
@@ -481,7 +481,8 @@ mkdir -p "$REPO/docs/verification"
   printf 'checked against git. Applying it is the applier\x27s business, and out of scope.\n\n'
   printf '| Criterion | Result |\n| --- | --- |\n'
   printf '| One `copy_paste` call hands off a change | %s |\n' "$HANDOFF_OK"
-  printf '| The picker copies a bare patch that git accepts | %s |\n' "$PICKER_PAYLOAD_OK"
+  printf '| The picker copies the body alone, no fence and a trailing newline | %s |\n' "$PICKER_PAYLOAD_OK"
+  printf '| git apply --check accepts the picked payload | %s |\n' "$PATCH_APPLIES"
   printf '| The whole-reply path strips to the same patch | %s |\n' "$WHOLE_REPLY_OK"
   printf '| Reflow acceptable | %s |\n\n' "$REFLOW_ACCEPTABLE"
   printf '## Reflow\n\n%s\n\n' "$REFLOW"

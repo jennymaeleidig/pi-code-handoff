@@ -11,8 +11,8 @@ One fenced artifact in an assistant reply that a human copies out and applies ou
 _Avoid_: Snippet, patch output, copy block
 
 **Hand-off section**:
-The heading plus every block placed in one assistant message, in tool-call order. Absent when
-a turn produced no blocks.
+The rule, the heading, and every block placed in one assistant message, in tool-call order.
+Absent when a turn produced no blocks.
 _Avoid_: Footer, appendix, block dump
 
 **Caption**:

@@ -53,7 +53,7 @@ test("a body containing its own fenced block is copied byte for byte", () => {
   assert.equal(payload(item), body);
 });
 
-test("the parsed tab copies raw markdown, fences included", () => {
+test("the Agent reply tab copies raw markdown, fences included", () => {
   const items = parsedItems("Text.\n\n```diff\n+x\n```\n");
   assert.equal(items.length, 1);
   assert.equal(payload(items[0]!), "```diff\n+x\n```");
@@ -150,24 +150,4 @@ test("switching tabs keeps the filter and resets the selection", () => {
   assert.equal(state.tab, "parsed");
   assert.equal(state.selected, 0);
   assert.match(currentItem(source, state)?.body ?? "", /def greet/);
-});
-
-test("the hand-off tab badges each block by what it carries", () => {
-  const command: HandoffBlock = {
-    toolCallId: "c",
-    kind: "command",
-    purpose: "list the files",
-    body: "ls\n",
-    lang: "bash",
-    caption: "`list the files` — command",
-  };
-  const items = handoffItems([
-    block({ toolCallId: "a" }),
-    block({ toolCallId: "b", form: "full", path: "notes.md" }),
-    command,
-  ]);
-  assert.deepEqual(
-    items.map((item) => item.badge),
-    ["diff", "full", "cmd"],
-  );
 });

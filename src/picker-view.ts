@@ -35,7 +35,7 @@ const MAX_ROWS = 10;
 const PREVIEW_LINES = 5;
 
 /** The slice of `Theme` the overlay draws with. */
-export interface PickerTheme {
+interface PickerTheme {
   fg(color: ThemeColor, text: string): string;
   bold(text: string): string;
   underline(text: string): string;
@@ -123,13 +123,13 @@ function tabLabels(state: PickerState, source: PickerSource, theme: PickerTheme)
   )}`;
 }
 
-function itemRow(item: PickerItem, selected: boolean, width: number, theme: PickerTheme): string {
+function itemRow(item: PickerItem, selected: boolean, theme: PickerTheme): string {
   const arrow = selected ? theme.fg("accent", "→") : " ";
   const badge = item.badge === undefined ? "" : ` ${renderBadge(item.badge, selected, theme)}`;
   const label = selected
     ? theme.fg("accent", theme.bold(item.label))
     : theme.fg("text", item.label);
-  return truncateToWidth(`${arrow}${badge} ${label}`, width, "…");
+  return `${arrow}${badge} ${label}`;
 }
 
 function renderBadge(badge: string, selected: boolean, theme: PickerTheme): string {
@@ -180,7 +180,7 @@ function helpLine(theme: PickerTheme, width: number): string {
 }
 
 /** Every line the overlay shows, at this width. */
-export function renderPicker(
+function renderPicker(
   source: PickerSource,
   state: PickerState,
   width: number,
@@ -201,9 +201,7 @@ export function renderPicker(
     const end = Math.min(items.length, start + MAX_ROWS);
     for (let offset = start; offset < end; offset += 1) {
       const item = items[offset]!;
-      lines.push(
-        row(` ${itemRow(item, offset === state.selected, width - 4, theme)}`, width, theme),
-      );
+      lines.push(row(` ${itemRow(item, offset === state.selected, theme)}`, width, theme));
     }
     if (items.length > MAX_ROWS) {
       lines.push(row(` ${theme.fg("dim", `${state.selected + 1}/${items.length}`)}`, width, theme));

@@ -1,5 +1,5 @@
 /**
- * The parsed tab's view of a reply: its own markdown blocks, read back out of
+ * The Agent reply tab's view of a reply: its own markdown blocks, read back out of
  * the message text as raw markdown.
  *
  * A block is copied whole — a table keeps its rows, a list its items, a
@@ -77,7 +77,7 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
   while (index < lines.length) {
     const fence = fences.get(index);
     if (fence) {
-      // The parsed tab copies the source, fences included, so it slices the
+      // The Agent reply tab copies the source, fences included, so it slices the
       // lines rather than using the scanner's deindented `body`.
       blocks.push({
         label: fenceCaption(fence.lang, index + 1),

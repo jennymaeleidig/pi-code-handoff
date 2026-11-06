@@ -92,7 +92,7 @@ test("memory wins only when it belongs to the same reply", () => {
   assert.equal(replyBlocks(branch, reply, undefined)[0]!.body, block.body);
 });
 
-test("a reply without a timestamp falls back to the parsed tab, not to stale memory", () => {
+test("a reply without a timestamp falls back to the Agent reply tab, not to stale memory", () => {
   const entries = [
     { type: "message", message: { role: "assistant", content: [{ type: "text", text: "reply" }] } },
     stored(null, [block]),

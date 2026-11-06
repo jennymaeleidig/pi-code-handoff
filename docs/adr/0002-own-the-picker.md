@@ -42,9 +42,9 @@ Rejected:
   now serves the whole-reply path alone (`/copy`, `ctrl+x`); the contract states the rule and
   its reason.
 - The hand-off tab reads blocks the extension holds in memory, so the list is written to the
-  session once per assistant message. The Agent reply tab covers the case where that list is absent —
-  a reply from before this extension was installed, or one whose entry does not match the
-  message's timestamp — which makes it load-bearing rather than decorative.
+  session once per assistant message. The Agent reply tab covers the case where that list is
+  absent — a reply from before this extension was installed, or one whose entry does not match
+  the message's timestamp — which makes it load-bearing rather than decorative.
 - This repository now owns a fence scanner, so a close longer than its opener, a close carrying
   an info string, and an unterminated block each need a test.
 - `Picker` in `GLOSSARY.md` stops meaning somebody else's overlay.

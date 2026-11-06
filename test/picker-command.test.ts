@@ -45,7 +45,7 @@ test("the hand-off tab opens over blocks persisted for the last reply", async ()
   assert.ok(rendered!.some((line) => /type to filter/.test(line)));
 });
 
-test("no hand-off blocks: the picker opens on the parsed tab and says so", async () => {
+test("no hand-off blocks: the picker opens on the Agent reply tab and says so", async () => {
   const harness = loadExtension("/tmp");
   const branch = [reply("Text.\n\n```ts\nconst a = 1;\n```\n")];
 

@@ -34,6 +34,10 @@ a reader that strips the fences gets the body's trailing newline back, and a pat
 one is `corrupt patch` to git. That blank line serves the whole-reply path; the picker's
 hand-off tab copies the body from memory and never reads the fences.
 
+The section itself opens with a horizontal rule above its heading, so it reads as separate
+from the reply's prose. The rule is part of the reply and never part of a block: stripping a
+block's fences leaves it above them.
+
 ## Two copy paths
 
 - **Picker path** (`/copy-paste`, `Ctrl+Shift+C`): the hand-off tab copies the block the

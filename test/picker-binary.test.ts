@@ -110,7 +110,7 @@ test(
       assert.match(reply.text, /````md\n# Notes/);
       assert.ok(reply.text.includes(NOTES), "the spliced text is not the block body");
 
-      // The parsed tab reproduces the same body from markdown, fences included.
+      // The Agent reply tab reproduces the same body from markdown, fences included.
       state = switchTab(state, "parsed");
       const parsed = currentItem(source, state)!;
       assert.equal(parsed.body, "````md\n" + NOTES + "\n````");
