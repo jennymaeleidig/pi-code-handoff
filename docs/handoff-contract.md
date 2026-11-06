@@ -31,11 +31,12 @@ so a full-file block that contains fences of its own cannot terminate early. The
 computed from the content rather than written by hand. A non-empty block leaves one empty
 line before the closing fence, because a fenced body cannot otherwise carry a final newline:
 a reader that strips the fences gets the body's trailing newline back, and a patch that lost
-one is `corrupt patch` to git.
+one is `corrupt patch` to git. That blank line serves the whole-reply path; the picker's
+hand-off tab copies the body from memory and never reads the fences.
 
 ## Two copy paths
 
-- **Picker path** (`/copy-paste`, not yet shipped): the hand-off tab copies the block the
+- **Picker path** (`/copy-paste`, `Ctrl+Shift+C`): the hand-off tab copies the block the
   extension validated rather than re-reading rendered markdown, so a `diff` block's clipboard
   payload is a bare patch and needs no fence handling at all. That promise covers the hand-off
   tab alone: the picker's parsed tab reads markdown back out of the message text and promises

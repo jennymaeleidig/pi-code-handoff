@@ -29,6 +29,14 @@ export interface FencedBlock {
   terminated: boolean;
 }
 
+/** Where a fence sits in the text, for callers that need the source verbatim. */
+export interface FenceSpan extends FencedBlock {
+  /** Zero-based index of the opening fence line. */
+  start: number;
+  /** Zero-based index after the closing fence, or the line count when unterminated. */
+  end: number;
+}
+
 const OPENING = /^( {0,3})(`{3,}|~{3,})(.*)$/;
 const CLOSING = /^ {0,3}(`{3,}|~{3,})[ \t]*$/;
 
@@ -44,8 +52,8 @@ function closes(line: string, fence: string): boolean {
   return run !== undefined && run[0] === fence[0] && run.length >= fence.length;
 }
 
-export function scanFencedBlocks(text: string): FencedBlock[] {
-  const blocks: FencedBlock[] = [];
+export function scanFenceSpans(text: string): FenceSpan[] {
+  const blocks: FenceSpan[] = [];
   const lines = text.split(/\r\n|\r|\n/);
   let index = 0;
 
@@ -60,6 +68,7 @@ export function scanFencedBlocks(text: string): FencedBlock[] {
     }
 
     const body: string[] = [];
+    const start = index;
     let terminated = false;
     index += 1;
     for (; index < lines.length; index += 1) {
@@ -75,8 +84,12 @@ export function scanFencedBlocks(text: string): FencedBlock[] {
     // how a hand-off block carries its body's trailing newline, does.
     if (!terminated && body.at(-1) === "") body.pop();
 
-    blocks.push({ lang: info.trim(), body: body.join("\n"), terminated });
+    blocks.push({ lang: info.trim(), body: body.join("\n"), terminated, start, end: index });
   }
 
   return blocks;
+}
+
+export function scanFencedBlocks(text: string): FencedBlock[] {
+  return scanFenceSpans(text).map(({ lang, body, terminated }) => ({ lang, body, terminated }));
 }

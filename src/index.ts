@@ -1,7 +1,12 @@
 import { realpath, readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import type { ExtensionAPI, ExtensionToolContext } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  ExtensionToolContext,
+} from "@earendil-works/pi-coding-agent";
+import { copyToClipboard } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { countDiff, splitText, unifiedDiff } from "./diff.ts";
@@ -18,6 +23,15 @@ import {
 } from "./handoff.ts";
 import { applyReplacements, type Replacement } from "./replace.ts";
 import { applyHunks, parsePatch } from "./patch.ts";
+import { payload, pickerFor, type PickerItem } from "./picker.ts";
+import { createPickerView } from "./picker-view.ts";
+import {
+  HANDOFF_ENTRY,
+  handoffEntry,
+  type HandoffMemory,
+  messageTimestamp,
+  type SessionEntryLike,
+} from "./session.ts";
 
 const schema = Type.Object({
   kind: StringEnum(["code", "command"] as const),
@@ -274,6 +288,46 @@ async function diffResult(
 }
 
 /**
+ * The blocks for the last reply: this session's memory first — byte-identical
+ * to what validation accepted — then the entry written to the session (a
+ * `/reload` or a resume), then nothing, so the parsed tab takes over.
+ */
+async function openCopyPicker(
+  ctx: ExtensionContext,
+  memory: HandoffMemory | undefined,
+): Promise<void> {
+  if (ctx.mode !== "tui") {
+    ctx.ui.notify("The copy picker needs interactive mode.", "error");
+    return;
+  }
+
+  const resolved = pickerFor(ctx.sessionManager.getBranch() as readonly SessionEntryLike[], memory);
+  if (resolved === undefined) {
+    ctx.ui.notify("No assistant reply to pick a block from.", "warning");
+    return;
+  }
+
+  const item = await ctx.ui.custom<PickerItem | undefined>(
+    (tui, theme, keybindings, done) =>
+      createPickerView({
+        source: resolved.source,
+        theme,
+        keybindings,
+        requestRender: () => tui.requestRender(),
+        done,
+      }),
+    {
+      overlay: true,
+      overlayOptions: { width: "80%", maxHeight: "80%", anchor: "center" },
+    },
+  );
+
+  if (item === undefined) return;
+  await copyToClipboard(payload(item));
+  ctx.ui.notify(`Copied ${item.label}.`, "info");
+}
+
+/**
  * A validated hand-off block tool. Blocks live only in memory until the
  * assistant message ends; the extension then splices them into that message,
  * so the text a human copies is exactly the text git accepted.
@@ -282,11 +336,14 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
   let pending: HandoffBlock[] = [];
   let callOrder: string[] = [];
   let claimedPaths = new Set<string>();
+  /** The last reply's blocks, kept for the picker across the turn. */
+  let lastHandoff: HandoffMemory | undefined;
 
   pi.on("session_start", async () => {
     pending = [];
     callOrder = [];
     claimedPaths = new Set();
+    lastHandoff = undefined;
   });
 
   pi.on("message_end", async (event) => {
@@ -325,6 +382,11 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       .map((entry) => entry.block);
 
     const text = renderSection(ordered);
+    const timestamp = messageTimestamp(message.timestamp);
+    // Persist the list with the message it belongs to, so the picker can
+    // rebuild the hand-off tab after /reload or a session resume.
+    lastHandoff = { messageTimestamp: timestamp, blocks: ordered };
+    pi.appendEntry(HANDOFF_ENTRY, handoffEntry(timestamp, ordered));
     pending = [];
     callOrder = [];
     claimedPaths = new Set();
@@ -335,6 +397,20 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
         content: [...message.content, { type: "text", text }],
       },
     };
+  });
+
+  pi.registerCommand("copy-paste", {
+    description: "Pick a block from the last reply and copy it",
+    handler: async (_args, ctx) => {
+      await openCopyPicker(ctx, lastHandoff);
+    },
+  });
+
+  pi.registerShortcut("ctrl+shift+c", {
+    description: "Pick a block from the last reply and copy it",
+    handler: async (ctx) => {
+      await openCopyPicker(ctx, lastHandoff);
+    },
   });
 
   pi.registerTool({

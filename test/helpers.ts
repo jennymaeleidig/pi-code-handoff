@@ -43,10 +43,36 @@ interface MessageEndHandler {
   }): Promise<{ message?: unknown } | undefined> | undefined;
 }
 
+interface CommandOptions {
+  description?: string;
+  handler: (args: string, ctx: unknown) => Promise<void>;
+}
+
+interface ShortcutOptions {
+  description?: string;
+  handler: (ctx: unknown) => Promise<void>;
+}
+
+export interface FakeContextOptions {
+  branch?: unknown[];
+  mode?: string;
+  width?: number;
+}
+
+export interface CommandResult {
+  notices: string[];
+  /** What the picker rendered before the interaction was cancelled. */
+  rendered: string[] | undefined;
+}
+
 export interface Harness {
   directory: string;
   tool: ToolDefinition;
   toolCalls: string[];
+  /** Custom entries the extension appended with `pi.appendEntry`. */
+  entries: Array<{ type: "custom"; customType: string; data?: unknown }>;
+  commands: Map<string, CommandOptions>;
+  shortcuts: Map<string, ShortcutOptions>;
   execute(
     id: string,
     params: Record<string, unknown>,
@@ -57,11 +83,79 @@ export interface Harness {
   finalMessage(text?: string): unknown;
   /** The appended hand-off section, or undefined when none was spliced. */
   appendHandoff(text?: string): Promise<string | undefined>;
+  /** Run a registered command or shortcut against a stand-in context. */
+  runCommand(name: string, options?: FakeContextOptions): Promise<CommandResult>;
+  runShortcut(key: string, options?: FakeContextOptions): Promise<CommandResult>;
+}
+
+const SELECT_KEYS: Record<string, string> = {
+  "tui.select.up": "up",
+  "tui.select.down": "down",
+  "tui.select.pageUp": "pageup",
+  "tui.select.pageDown": "pagedown",
+  "tui.select.confirm": "enter",
+  "tui.select.cancel": "escape",
+};
+
+function fakeTheme() {
+  const pass = (text: string) => text;
+  return {
+    fg: (_color: string, text: string) => text,
+    bg: (_color: string, text: string) => text,
+    style: (text: string) => text,
+    bold: pass,
+    italic: pass,
+    underline: pass,
+  };
+}
+
+function fakeKeybindings() {
+  return {
+    matches: (data: string, keybinding: string) => data === SELECT_KEYS[keybinding],
+  };
+}
+
+function fakeContext(
+  directory: string,
+  options: FakeContextOptions,
+  onRender: (lines: string[]) => void,
+) {
+  const branch = options.branch ?? [];
+  const notices: string[] = [];
+  return {
+    notices,
+    ctx: {
+      mode: options.mode ?? "tui",
+      cwd: directory,
+      sessionManager: {
+        getBranch: () => branch,
+        getEntries: () => branch,
+      },
+      ui: {
+        notify: (message: string) => {
+          notices.push(message);
+        },
+        custom: async (factory: (...args: unknown[]) => unknown) => {
+          const component = (await factory(
+            { requestRender: () => {} },
+            fakeTheme(),
+            fakeKeybindings(),
+            () => {},
+          )) as { render(width: number): string[] };
+          onRender(component.render(options.width ?? 80));
+          return undefined;
+        },
+      },
+    },
+  };
 }
 
 export function loadExtension(directory: string): Harness {
   let tool: ToolDefinition | undefined;
   const handlers = new Map<string, MessageEndHandler>();
+  const commands = new Map<string, CommandOptions>();
+  const shortcuts = new Map<string, ShortcutOptions>();
+  const entries: Array<{ type: "custom"; customType: string; data?: unknown }> = [];
   let counter = 0;
   const toolCalls: string[] = [];
 
@@ -71,6 +165,15 @@ export function loadExtension(directory: string): Harness {
     },
     registerTool(definition: ToolDefinition) {
       tool = definition;
+    },
+    registerCommand(name: string, options: CommandOptions) {
+      commands.set(name, options);
+    },
+    registerShortcut(key: string, options: ShortcutOptions) {
+      shortcuts.set(key, options);
+    },
+    appendEntry(customType: string, data?: unknown) {
+      entries.push({ type: "custom", customType, data });
     },
   } as unknown as ExtensionAPI;
 
@@ -117,19 +220,53 @@ export function loadExtension(directory: string): Harness {
     return last?.type === "text" ? last.text : undefined;
   };
 
+  const runHandler = async (
+    handler: (ctx: unknown) => Promise<void>,
+    options: FakeContextOptions,
+  ) => {
+    let rendered: string[] | undefined;
+    const { notices, ctx } = fakeContext(directory, options, (lines) => {
+      rendered = lines;
+    });
+    await handler(ctx);
+    return { notices, rendered };
+  };
+
+  const runCommand = async (name: string, options: FakeContextOptions = {}) => {
+    const command = commands.get(name);
+    if (!command) throw new Error(`no command named ${name}`);
+    return runHandler((ctx) => command.handler("", ctx), options);
+  };
+
+  const runShortcut = async (key: string, options: FakeContextOptions = {}) => {
+    const shortcut = shortcuts.get(key);
+    if (!shortcut) throw new Error(`no shortcut bound to ${key}`);
+    return runHandler((ctx) => shortcut.handler(ctx), options);
+  };
+
   return {
     directory,
     tool,
     toolCalls,
+    entries,
+    commands,
+    shortcuts,
     execute,
     emit,
     toolCallMessage,
     finalMessage,
     appendHandoff,
+    runCommand,
+    runShortcut,
   };
 }
 
-/** Extract a block body between its fences, as the whole-reply path's applier does. */
+/**
+ * Extract a block body between its fences, as the whole-reply path's applier
+ * does. `renderBlock` leaves one empty line before the closing fence because a
+ * fenced body cannot otherwise carry a final newline: line-joining keeps that
+ * last empty line, so the result ends in the body's trailing newline.
+ */
 export function blockBody(section: string): string {
   const lines = section.split("\n");
   const start = lines.findIndex((line) => /^`{3,}/.test(line));
