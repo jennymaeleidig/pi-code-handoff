@@ -10,6 +10,7 @@ you:    Move parseKey into src/keys.ts and hand it off.
 pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --check passed.
         Validated src/keys.ts: new file, 18 lines.
 
+
         ---
 
         ## Hand-off
@@ -131,5 +132,5 @@ Applying a block is the applier's business — that code lives in your dotfiles,
 is out of scope. Re-run it whenever the picker, the hand-off section or the splice changes.
 
 The wizard exits non-zero when a check it can make fails. Anything the run contradicted in
-`docs/handoff-contract.md` is different: it is written into the report and left to you, because
-whether a guarantee held is a judgement about prose, not a check.
+`docs/handoff-contract.md` is not a check: the report is the record, and whether a guarantee
+held is a judgement you make reading it.

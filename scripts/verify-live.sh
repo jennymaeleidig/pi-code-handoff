@@ -252,7 +252,7 @@ clear_state() {
   [[ -f "$ENV_FILE" ]] || return 0
   local tmp
   tmp=$(mktemp)
-  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|PATCH_APPLIES|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE|CONTRADICTIONS)=' \
+  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|PATCH_APPLIES|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE)=' \
     "$ENV_FILE" > "$tmp" || true
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
@@ -468,11 +468,9 @@ write_env REFLOW "$REFLOW"
 write_env REFLOW_ACCEPTABLE "$REFLOW_ACCEPTABLE"
 
 stage "Record the run"
-say "Last thing: anything this run contradicted in docs/handoff-contract.md —"
-say "a guarantee that did not hold, a caption that misled, a step that needed"
-say "a workaround. This is the criterion that fixes the contract rather than the code."
-ask CONTRADICTIONS "What did the run contradict? ('none' if nothing):"
-write_env CONTRADICTIONS "$CONTRADICTIONS"
+say "Last thing, and nothing to type: the report goes to docs/verification/. Read it"
+say "against docs/handoff-contract.md — a guarantee that did not hold, a caption that"
+say "misled — and fix the contract rather than the code. Nothing here is gated on it."
 mkdir -p "$REPO/docs/verification"
 {
   printf '# Live verification: %s\n\n' "$(date +%Y-%m-%d)"
@@ -486,9 +484,9 @@ mkdir -p "$REPO/docs/verification"
   printf '| The whole-reply path strips to the same patch | %s |\n' "$WHOLE_REPLY_OK"
   printf '| Reflow acceptable | %s |\n\n' "$REFLOW_ACCEPTABLE"
   printf '## Reflow\n\n%s\n\n' "$REFLOW"
-  printf '## What the contract must change\n\n%s\n\n' "$CONTRADICTIONS"
-  printf 'This answer does not affect the result above: it is a judgement for whoever reads\n'
-  printf 'this report, and the fix belongs in `docs/handoff-contract.md`.\n\n'
+  printf '## What the contract must change\n\nThis report is the record: read it against\n'
+  printf '`docs/handoff-contract.md` and fix the contract where the run contradicted it.\n'
+  printf 'Nothing in the table above is gated on that reading.\n\n'
   printf '## Environment\n\n'
   printf -- '- pi: %s\n' "$PI_VERSION"
   printf -- '- node: %s\n' "$NODE_VERSION"

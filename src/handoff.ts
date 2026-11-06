@@ -92,8 +92,9 @@ export function renderBlock(block: HandoffBlock): string {
 
 export function renderSection(blocks: HandoffBlock[]): string {
   // A rule above the heading separates the hand-off from the reply's prose: a
-  // heading alone read as another paragraph of the answer.
-  return `\n\n---\n\n## Hand-off\n\n${blocks.map(renderBlock).join("\n\n")}\n`;
+  // heading alone read as another paragraph of the answer. Three newlines, so
+  // the rule has a blank line on both sides of the gap it opens.
+  return `\n\n\n---\n\n## Hand-off\n\n${blocks.map(renderBlock).join("\n\n")}\n`;
 }
 
 export function diffCaption(path: string, hunks: number): string {

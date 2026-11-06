@@ -39,7 +39,7 @@ test("code+diff emits a counted, validated diff and the splice carries it", asyn
     const section = await harness.appendHandoff();
     assert.equal(
       section,
-      "\n\n---\n\n## Hand-off\n\n`src/example.ts` — 1 hunk\n\n" +
+      "\n\n\n---\n\n## Hand-off\n\n`src/example.ts` — 1 hunk\n\n" +
         "```diff\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n\n```\n",
     );
     assert.ok(
