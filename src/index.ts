@@ -316,8 +316,8 @@ async function openCopyPicker(
     return;
   }
 
-  const resolved = pickerFor(ctx.sessionManager.getBranch() as readonly SessionEntryLike[], memory);
-  if (resolved === undefined) {
+  const source = pickerFor(ctx.sessionManager.getBranch() as readonly SessionEntryLike[], memory);
+  if (source === undefined) {
     ctx.ui.notify("No assistant reply to pick a block from.", "warning");
     return;
   }
@@ -325,7 +325,7 @@ async function openCopyPicker(
   const item = await ctx.ui.custom<PickerItem | undefined>(
     (tui, theme, keybindings, done) =>
       createPickerView({
-        source: resolved.source,
+        source,
         theme,
         keybindings,
         requestRender: () => tui.requestRender(),

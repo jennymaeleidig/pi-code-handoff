@@ -9,13 +9,7 @@
 
 import type { HandoffBlock } from "./handoff.ts";
 import { parseMarkdownBlocks } from "./markdown.ts";
-import {
-  type HandoffMemory,
-  lastReply,
-  type Reply,
-  replyBlocks,
-  type SessionEntryLike,
-} from "./session.ts";
+import { type HandoffMemory, lastReply, replyBlocks, type SessionEntryLike } from "./session.ts";
 
 export type PickerTab = "handoff" | "parsed";
 
@@ -56,10 +50,10 @@ export function pickerSource(blocks: readonly HandoffBlock[], text: string): Pic
 export function pickerFor(
   branch: readonly SessionEntryLike[],
   memory: HandoffMemory | undefined,
-): { reply: Reply; source: PickerSource } | undefined {
+): PickerSource | undefined {
   const reply = lastReply(branch);
   if (reply === undefined) return undefined;
-  return { reply, source: pickerSource(replyBlocks(branch, reply, memory), reply.text) };
+  return pickerSource(replyBlocks(branch, reply, memory), reply.text);
 }
 
 /** Open on hand-off when it has something; on parsed when it does not. */

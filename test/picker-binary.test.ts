@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createPicker, currentItem, payload, pickerFor, switchTab } from "../src/picker.ts";
-import type { SessionEntryLike } from "../src/session.ts";
+import { lastReply, type SessionEntryLike } from "../src/session.ts";
 import { makeRepo, remove } from "./helpers.ts";
 import { NOTES } from "./fixtures/fenced-body-provider.ts";
 
@@ -94,9 +94,9 @@ test(
         .filter((line) => line.trim() !== "")
         .map((line) => JSON.parse(line) as SessionEntryLike);
 
-      const resolved = pickerFor(entries, undefined);
-      assert.ok(resolved, "no assistant reply was persisted");
-      const { reply, source } = resolved!;
+      const source = pickerFor(entries, undefined);
+      assert.ok(source, "no assistant reply was persisted");
+      const reply = lastReply(entries)!;
       assert.equal(source.handoff.length, 1);
       assert.equal(source.handoff[0]!.body, NOTES, "the persisted block body changed");
 

@@ -664,3 +664,21 @@ test("empty full content is refused with an error naming the rule", async () => 
     await remove(repo);
   }
 });
+
+test("a change too large to diff reliably is refused with the way out", async () => {
+  const oldLines = Array.from({ length: 1100 }, (_, index) => `old ${index}\n`).join("");
+  const newLines = Array.from({ length: 1100 }, (_, index) => `new ${index}\n`).join("");
+  const repo = await makeRepo({ "big.txt": oldLines });
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "big.txt",
+      content: newLines,
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /too large to diff reliably/);
+  } finally {
+    await remove(repo);
+  }
+});

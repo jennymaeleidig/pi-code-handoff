@@ -77,6 +77,8 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
   while (index < lines.length) {
     const fence = fences.get(index);
     if (fence) {
+      // The parsed tab copies the source, fences included, so it slices the
+      // lines rather than using the scanner's deindented `body`.
       blocks.push({
         label: fenceCaption(fence.lang, index + 1),
         body: lines.slice(index, fence.end).join("\n"),
