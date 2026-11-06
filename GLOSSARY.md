@@ -65,8 +65,8 @@ _Avoid_: Consumer, patcher, DiffApply
 **Picker**:
 `/copy-paste`'s overlay, the copy path that reaches a block from inside pi: a hand-off tab
 listing this reply's validated blocks, an Agent reply tab listing the reply's own markdown
-blocks, a count on each tab, a preview of the highlighted block, and a position counter once
-there is more than one block to tell apart.
+blocks, a count in brackets on each tab, a preview of the highlighted block, and a position
+counter once there is more than one block to tell apart.
 _Avoid_: Clip, copy menu
 
 **Hand-off tab**:

@@ -431,7 +431,7 @@ if [[ -n "$reply" ]]; then
 fi
 # The first fenced block after the heading, with its own fence lines removed.
 awk '
-  /^## Hand-off$/ { section = 1; next }
+  /^## Hand-off/ { section = 1; next }
   section && !opened && /^`{3,}/ { opened = 1; next }
   section && opened && /^`{3,}/ { exit }
   section && opened { print }

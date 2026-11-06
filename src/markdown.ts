@@ -25,8 +25,8 @@ const TABLE_ROW = /^ {0,3}\|?\s*[^|\n]+\|/;
 const TABLE_DELIMITER = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*$/;
 
 function fenceCaption(lang: string, line: number): string {
-  const label = lang === "" ? "code block" : `${lang} code block`;
-  return `${label} — line ${line}`;
+  const tag = lang === "" ? "code" : lang;
+  return `[${tag}] — line ${line}`;
 }
 
 function tableStart(lines: string[], index: number): boolean {
@@ -94,7 +94,7 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
       }
       const rows = end - index - 2;
       blocks.push({
-        label: `table — ${plural(rows, "row")}, line ${index + 1}`,
+        label: `[table] — ${plural(rows, "row")}, line ${index + 1}`,
         body: lines.slice(index, end).join("\n"),
       });
       index = end;
@@ -105,7 +105,7 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
       let end = index;
       while (end < lines.length && BLOCKQUOTE.test(lines[end]!)) end += 1;
       blocks.push({
-        label: `blockquote — line ${index + 1}`,
+        label: `[quote] — line ${index + 1}`,
         body: lines.slice(index, end).join("\n"),
       });
       index = end;
@@ -116,7 +116,7 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
       const end = listEnd(lines, index);
       const items = lines.slice(index, end).filter((line) => LIST_ITEM.test(line)).length;
       blocks.push({
-        label: `list — ${plural(items, "item")}, line ${index + 1}`,
+        label: `[list] — ${plural(items, "item")}, line ${index + 1}`,
         body: lines.slice(index, end).join("\n"),
       });
       index = end;

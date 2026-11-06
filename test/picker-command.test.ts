@@ -52,7 +52,7 @@ test("no hand-off blocks: the picker opens on the Agent reply tab and says so", 
   const { rendered } = await harness.runCommand("copy-paste", { branch });
 
   assert.ok(rendered!.some((line) => /No hand-off blocks/.test(line)));
-  assert.ok(rendered!.some((line) => /ts code block/.test(line)));
+  assert.ok(rendered!.some((line) => /\[ts\] — line 3/.test(line)));
 });
 
 test("no assistant reply at all: the picker refuses", async () => {
@@ -61,13 +61,13 @@ test("no assistant reply at all: the picker refuses", async () => {
   assert.match(notices.join("\n"), /No assistant reply/);
 });
 
-test("a reply with no blocks still opens, and the picker says there is nothing to copy", async () => {
+test("a reply with no blocks still opens, offering the whole response", async () => {
   const harness = loadExtension("/tmp");
   const { notices, rendered } = await harness.runCommand("copy-paste", {
     branch: [reply("Just prose, no blocks.")],
   });
   assert.deepEqual(notices, []);
-  assert.ok(rendered!.some((line) => /No blocks in this reply/.test(line)));
+  assert.ok(rendered!.some((line) => /\[md\] — full response/.test(line)));
 });
 
 test("outside interactive mode the command declines instead of copying", async () => {
@@ -80,7 +80,7 @@ test("the shortcut runs the same picker", async () => {
   const harness = loadExtension("/tmp");
   const branch = [reply("Text.\n\n```ts\nx\n```\n")];
   const { rendered } = await harness.runShortcut("ctrl+shift+c", { branch });
-  assert.ok(rendered!.some((line) => /ts code block/.test(line)));
+  assert.ok(rendered!.some((line) => /\[ts\] — line 3/.test(line)));
 });
 
 test("the spliced reply is persisted as a hand-off entry for its message", async () => {

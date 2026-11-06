@@ -13,7 +13,7 @@ pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --
 
         ---
 
-        ## Hand-off
+        ## Hand-off — 2 blocks
 
         `src/index.ts` — 2 hunks
 
@@ -91,8 +91,9 @@ the list's foot appears once a reply holds more than one block, so a list you ha
 not mistaken for the whole of it. The blocks are restored from the session entry written with
 the reply, so the tab survives `/reload` and a resumed session; it is empty only when that entry
 is missing or does not match the reply — one from before the install, or a message with no
-timestamp — and then the Agent reply tab is what is left. That tab copies markdown read
-back out of the message, fences included.
+timestamp — and then the Agent reply tab is what is left. That tab lists what the message itself
+is made of — each fenced block, table, list and quote, tagged with its kind and where it
+starts — and ends with the whole reply as one item, so there is always something to take.
 
 **The applier.** What you paste into is yours:
 

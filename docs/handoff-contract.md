@@ -36,7 +36,8 @@ hand-off tab copies the body from memory and never reads the fences.
 
 The section itself opens with a horizontal rule above its heading, so it reads as separate
 from the reply's prose. The rule is part of the reply and never part of a block: stripping a
-block's fences leaves it above them.
+block's fences leaves it above them. The heading names the count — `## Hand-off — 3 blocks` —
+because the picker's tabs cannot be seen from the transcript.
 
 ## Two copy paths
 

@@ -7,7 +7,7 @@
  * byte for byte — is checked by unit tests rather than by hand.
  */
 
-import { blockBadge, type HandoffBlock } from "./handoff.ts";
+import { blockBadge, type HandoffBlock, plural } from "./handoff.ts";
 import { parseMarkdownBlocks } from "./markdown.ts";
 import { type HandoffMemory, lastReply, replyBlocks, type SessionEntryLike } from "./session.ts";
 
@@ -45,7 +45,15 @@ export function handoffItems(blocks: readonly HandoffBlock[]): PickerItem[] {
 
 /** The Agent reply tab: the reply's own markdown blocks, copied as raw markdown. */
 export function parsedItems(text: string): PickerItem[] {
-  return parseMarkdownBlocks(text).map((block) => ({ label: block.label, body: block.body }));
+  const blocks = parseMarkdownBlocks(text).map((block) => ({
+    label: block.label,
+    body: block.body,
+  }));
+  if (text.trim() === "") return blocks;
+  // Last, so the blocks themselves stay the first thing under the cursor; this
+  // is the way out when nothing else on offer is the thing you want.
+  const lines = (text.endsWith("\n") ? text.slice(0, -1) : text).split(/\r\n|\r|\n/).length;
+  return [...blocks, { label: `[md] — full response, ${plural(lines, "line")}`, body: text }];
 }
 
 export function pickerSource(blocks: readonly HandoffBlock[], text: string): PickerSource {

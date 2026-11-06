@@ -55,8 +55,10 @@ test("a body containing its own fenced block is copied byte for byte", () => {
 
 test("the Agent reply tab copies raw markdown, fences included", () => {
   const items = parsedItems("Text.\n\n```diff\n+x\n```\n");
-  assert.equal(items.length, 1);
+  assert.equal(items.length, 2);
   assert.equal(payload(items[0]!), "```diff\n+x\n```");
+  assert.match(items[1]!.label, /\[md\] — full response, 5 lines/);
+  assert.equal(payload(items[1]!), "Text.\n\n```diff\n+x\n```\n");
 });
 
 test("the picker opens on the hand-off tab when it has blocks", () => {
@@ -69,16 +71,18 @@ test("no hand-off blocks: the picker opens on parsed and says why", () => {
   const source = pickerSource([], "```ts\nx\n```\n");
   const state = createPicker(source);
   assert.equal(state.tab, "parsed");
-  assert.equal(visibleItems(source, state).length, 1);
+  assert.equal(visibleItems(source, state).length, 2);
   assert.match(pickerNotice(source)!, /No hand-off blocks/);
 });
 
-test("a reply with no blocks at all still opens, on parsed, and says so", () => {
+test("a reply with no blocks at all still opens, on parsed, with the whole response", () => {
   const source = pickerSource([], "Just prose.");
   const state = createPicker(source);
   assert.equal(state.tab, "parsed");
-  assert.equal(visibleItems(source, state).length, 0);
-  assert.match(pickerNotice(source)!, /No blocks in this reply/);
+  assert.deepEqual(
+    visibleItems(source, state).map((item) => item.label),
+    ["[md] — full response, 1 line"],
+  );
 });
 
 test("typing filters labels and bodies, and resets the selection", () => {

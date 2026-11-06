@@ -16,6 +16,7 @@ import {
   truncateToWidth,
   visibleWidth,
 } from "@earendil-works/pi-tui";
+import { plural } from "./handoff.ts";
 import {
   createPicker,
   currentItem,
@@ -108,19 +109,33 @@ function row(content: string, innerWidth: number, theme: PickerTheme): string {
   return theme.fg("border", "│") + text + theme.fg("border", "│");
 }
 
-function tabLabels(state: PickerState, source: PickerSource, theme: PickerTheme): string {
-  // The count trails the name, so a bare digit is never read as a key to press.
-  const label = (tab: "handoff" | "parsed", name: string, count: number) => {
-    const text = `${name} ${count}`;
-    return state.tab === tab
+/**
+ * Both tabs with their totals. The unit is shed before the count is: `[3 blocks]`
+ * then `[3]` then a bare `3`, whichever fits.
+ */
+function tabLabels(
+  state: PickerState,
+  source: PickerSource,
+  innerWidth: number,
+  theme: PickerTheme,
+): string {
+  const paint = (tab: "handoff" | "parsed", text: string) =>
+    state.tab === tab
       ? theme.underline(theme.fg("accent", theme.bold(text)))
       : theme.fg("dim", text);
-  };
-  return `${label("handoff", "Hand-off", source.handoff.length)}  ${label(
-    "parsed",
-    "Agent reply",
-    source.parsed.length,
-  )}`;
+  const forms = [
+    (name: string, count: number) => `${name} [${plural(count, "block")}]`,
+    (name: string, count: number) => `${name} [${count}]`,
+    (name: string, count: number) => `${name} ${count}`,
+  ];
+  for (const form of forms) {
+    const handoff = form("Hand-off", source.handoff.length);
+    const parsed = form("Agent reply", source.parsed.length);
+    if (visibleWidth(`${handoff}  ${parsed}`) <= innerWidth - 2) {
+      return `${paint("handoff", handoff)}  ${paint("parsed", parsed)}`;
+    }
+  }
+  return "";
 }
 
 function itemRow(item: PickerItem, selected: boolean, theme: PickerTheme): string {
@@ -190,7 +205,7 @@ function renderPicker(
     row("", innerWidth, theme),
   ];
 
-  lines.push(row(` ${tabLabels(state, source, theme)}`, innerWidth, theme));
+  lines.push(row(` ${tabLabels(state, source, innerWidth, theme)}`, innerWidth, theme));
   lines.push(row("", innerWidth, theme));
 
   const items = visibleItems(source, state);
