@@ -246,6 +246,18 @@ clip_write() {
   fi
 }
 
+# clear_state: drops the answers recorded by an earlier run, so a re-run cannot
+# report the last run's verdicts under a fresh report.
+clear_state() {
+  [[ -f "$ENV_FILE" ]] || return 0
+  local tmp
+  tmp=$(mktemp)
+  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|APPLIED_OK|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE|CONTRADICTIONS)=' \
+    "$ENV_FILE" > "$tmp" || true
+  cat "$tmp" > "$ENV_FILE"
+  rm -f "$tmp"
+}
+
 # clip_into FILE: the clipboard payload, byte for byte, or an empty FILE.
 clip_into() {
   clip_read > "$1" 2>/dev/null || : > "$1"
@@ -329,11 +341,14 @@ src/index.ts that re-exports greeting with an explicit return type. Hand both of
 with copy_paste. Do not edit the files yourself.
 TXT
 note "the request to send is in $STATE/prompt.txt"
+clear_state
 pause
 
-stage "Hand off the change"
-say "In a second terminal or pane, start pi on the scratch repo:"
-step "cd \"$SCRATCH\" && pi -e \"$REPO/src/index.ts\""
+stage "Install it and hand off the change"
+say "In a second terminal or pane, install the package into the scratch repo"
+say "and start a real session on it:"
+step "cd \"$SCRATCH\" && pi install --local \"$REPO\""
+step "pi"
 say "Then send the request in $STATE/prompt.txt (print it with: cat $STATE/prompt.txt):"
 note "    Rename the exported function greet to greeting in src/greeting.ts, and"
 note "    create src/index.ts that re-exports greeting with an explicit return type."
@@ -341,6 +356,7 @@ note "    Hand both off with copy_paste. Do not edit the files yourself."
 say "The reply should end with a '## Hand-off' section holding two blocks:"
 step "one for src/greeting.ts, fenced diff, caption 'N hunk'"
 step "one for src/index.ts, fenced ts, caption 'new file, N lines'"
+step "each block sits under one copy_paste tool call above the reply"
 note "Leave pi running; the next stages use that session."
 pause "Press Enter once the blocks are in the reply"
 previous=$( _existing HANDOFF_OK || true )
@@ -389,7 +405,7 @@ write_env PICKER_PAYLOAD_OK "$PICKER_PAYLOAD_OK"
 stage "Apply it in your editor"
 say "Paste the patch into your applier and apply it against the scratch repo:"
 step "your applier (vim's :DiffApply, or whatever consumes a patch from the clipboard)"
-step "or plain, as a fallback: cd \"$SCRATCH\" && git apply -p1"
+step "no applier yet: cd \"$SCRATCH\" && git apply -p1 proves the payload, not this criterion"
 pause "Press Enter once it has been applied"
 if grep -q 'export function greeting' "$SCRATCH/src/greeting.ts"; then
   APPLIED_OK=yes
@@ -410,17 +426,23 @@ pause "Press Enter once the reply has been copied"
 clip_into "$STATE/reply.txt"
 reply="$(cat "$STATE/reply.txt")"
 if [[ -n "$reply" ]]; then
-  case "$reply" in
-    *'## Hand-off'*) note "✓ the hand-off section came along" ;;
-    *) warn "no Hand-off section in the clipboard; was a message selected?" ;;
-  esac
   show_prefix "$reply"
 fi
+case "$reply" in
+  *'## Hand-off'*) note "✓ the hand-off section came along" ;;
+  *)
+    REPLY_HAS_SECTION="no: the clipboard did not hold the reply"
+    warn "no Hand-off section in the clipboard; was a message selected?" ;;
+esac
+REPLY_HAS_SECTION=${REPLY_HAS_SECTION:-yes}
 say "Now let the applier strip the outer fence and apply the second block:"
 step "for src/index.ts the block is the file entire, so saving it over the path is applying it"
 step "by hand: drop the leading fence and its tag line, the closing run, and the empty line before it"
 pause "Press Enter once it has been applied"
-if [[ -f "$SCRATCH/src/index.ts" ]] && grep -q 'greeting' "$SCRATCH/src/index.ts"; then
+if [[ "$REPLY_HAS_SECTION" != yes ]]; then
+  WHOLE_REPLY_OK="no: the clipboard did not hold the reply"
+  warn "the whole-reply path did not copy the message"
+elif [[ -f "$SCRATCH/src/index.ts" ]] && grep -q 'greeting' "$SCRATCH/src/index.ts"; then
   WHOLE_REPLY_OK=yes
   note "✓ src/index.ts exists and re-exports greeting"
 else
@@ -468,6 +490,13 @@ note "✓ wrote $REPORT"
 SKIPPED+=("read $REPORT, then commit it: git add docs/verification")
 finish
 printf '  %sReport: %s%s\n\n' "$GREEN" "$REPORT" "$RESET"
+if [[ "$HANDOFF_OK" == yes && "$PICKER_PAYLOAD_OK" == yes &&
+  "$APPLIED_OK" == yes && "$WHOLE_REPLY_OK" == yes ]]; then
+  printf '  %s✓ every criterion passed%s\n\n' "$GREEN" "$RESET"
+else
+  printf '  %s⚠ the run did not pass; see the report%s\n\n' "$YELLOW" "$RESET"
+  exit 1
+fi
 }
 
 run_wizard "$@"; exit
