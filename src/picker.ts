@@ -7,7 +7,7 @@
  * byte for byte — is checked by unit tests rather than by hand.
  */
 
-import type { HandoffBlock } from "./handoff.ts";
+import { blockBadge, type HandoffBlock } from "./handoff.ts";
 import { parseMarkdownBlocks } from "./markdown.ts";
 import { type HandoffMemory, lastReply, replyBlocks, type SessionEntryLike } from "./session.ts";
 
@@ -39,7 +39,7 @@ export function handoffItems(blocks: readonly HandoffBlock[]): PickerItem[] {
   return blocks.map((block) => ({
     label: block.caption,
     body: block.body,
-    badge: block.kind === "command" ? "cmd" : (block.form ?? "diff"),
+    badge: blockBadge(block),
   }));
 }
 

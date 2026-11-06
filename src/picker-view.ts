@@ -3,9 +3,9 @@
  * to it. It owns no payload logic — `enter` hands the selected `PickerItem`
  * back to the command, which copies `payload(item)`.
  *
- * The rendering is a pure function of source, state, width and theme, so the
- * frame, the highlighted row and the preview are checked by unit tests rather
- * than by eye.
+ * The rendering is a pure function of source, state, width and theme. It is
+ * proven by the live run, not by a test: the parent spec allows one seam, the
+ * extension's boundary.
  */
 
 import type { KeybindingsManager, Theme, ThemeColor } from "@earendil-works/pi-coding-agent";
@@ -66,47 +66,46 @@ function windowStart(selected: number, count: number): number {
   return Math.min(Math.max(0, selected - MAX_ROWS + 1), count - MAX_ROWS);
 }
 
-/** A title centred in the rule, so the frame carries the label. */
-function topBorder(title: string, innerWidth: number, theme: PickerTheme): string {
-  const label = ` ${title} `;
-  const width = visibleWidth(label);
+/** A labelled rule: the frame's top edge, or a divider between sections. */
+function centredRule(
+  label: string,
+  innerWidth: number,
+  theme: PickerTheme,
+  edge: { open: string; close: string },
+  colour: ThemeColor,
+): string {
+  const text = ` ${label} `;
+  const width = visibleWidth(text);
+  // A label wider than the frame would push the edge past the right border, so
+  // the rule wins and the label is dropped.
+  if (width > innerWidth)
+    return theme.fg("border", edge.open + "─".repeat(innerWidth) + edge.close);
   const left = Math.max(0, Math.floor((innerWidth - width) / 2));
   const right = Math.max(0, innerWidth - width - left);
   return (
-    theme.fg("border", "╭" + "─".repeat(left)) +
-    theme.fg("accent", theme.bold(label)) +
-    theme.fg("border", "─".repeat(right) + "╮")
+    theme.fg("border", edge.open + "─".repeat(left)) +
+    theme.fg(colour, theme.bold(text)) +
+    theme.fg("border", "─".repeat(right) + edge.close)
   );
 }
 
-function sectionBorder(title: string, innerWidth: number, theme: PickerTheme): string {
-  const label = ` ${title} `;
-  const width = visibleWidth(label);
-  if (width >= innerWidth) return theme.fg("border", "├" + "─".repeat(innerWidth) + "┤");
-  const left = Math.max(0, Math.floor((innerWidth - width) / 2));
-  const right = Math.max(0, innerWidth - width - left);
-  return (
-    theme.fg("border", "├" + "─".repeat(left)) +
-    theme.fg("dim", theme.bold(label)) +
-    theme.fg("border", "─".repeat(right) + "┤")
-  );
-}
+const FRAME_TOP = { open: "╭", close: "╮" };
+const SECTION = { open: "├", close: "┤" };
 
 function midBorder(innerWidth: number, theme: PickerTheme): string {
-  return theme.fg("border", "├" + "─".repeat(innerWidth) + "┤");
+  return theme.fg("border", SECTION.open + "─".repeat(innerWidth) + SECTION.close);
 }
 
 function bottomBorder(innerWidth: number, theme: PickerTheme): string {
   return theme.fg("border", "╰" + "─".repeat(innerWidth) + "╯");
 }
 
-/** A bordered row, padded to the frame's width so text cannot bleed through. */
-function row(content: string, width: number, theme: PickerTheme): string {
-  return (
-    theme.fg("border", "│") +
-    truncateToWidth(content, Math.max(0, width - 2), "…", true) +
-    theme.fg("border", "│")
-  );
+/** A bordered row, padded to the frame's inner width so text cannot bleed through. */
+function row(content: string, innerWidth: number, theme: PickerTheme): string {
+  // One column of gutter on the right: a truncated line ends in `…`, and an
+  // ellipsis pressed against the border reads as part of the frame.
+  const text = truncateToWidth(content, Math.max(0, innerWidth - 1), "…", true) + " ";
+  return theme.fg("border", "│") + text + theme.fg("border", "│");
 }
 
 function tabLabels(state: PickerState, source: PickerSource, theme: PickerTheme): string {
@@ -143,14 +142,14 @@ function bodyLines(body: string): string[] {
   return text.split(/\r\n|\r|\n/);
 }
 
-function previewLines(item: PickerItem, width: number, theme: PickerTheme): string[] {
+function previewLines(item: PickerItem, innerWidth: number, theme: PickerTheme): string[] {
   const all = bodyLines(item.body);
   const shown = all.slice(0, PREVIEW_LINES);
-  const lines = shown.map((line) => row(` ${theme.fg("muted", line)}`, width, theme));
+  const lines = shown.map((line) => row(` ${theme.fg("muted", line)}`, innerWidth, theme));
   if (all.length > PREVIEW_LINES) {
     const more = all.length - PREVIEW_LINES;
     lines.push(
-      row(` ${theme.fg("dim", `… ${more} more line${more === 1 ? "" : "s"}`)}`, width, theme),
+      row(` ${theme.fg("dim", `… ${more} more line${more === 1 ? "" : "s"}`)}`, innerWidth, theme),
     );
   }
   return lines;
@@ -165,7 +164,7 @@ const HINTS: { key: string; text: string }[] = [
 ];
 
 /** The key hints that fit the frame; the rarest ones are dropped first. */
-function helpLine(theme: PickerTheme, width: number): string {
+function helpLine(theme: PickerTheme, innerWidth: number): string {
   const sets = [
     HINTS,
     HINTS.filter((hint) => hint.key !== "1/2"),
@@ -174,7 +173,7 @@ function helpLine(theme: PickerTheme, width: number): string {
   ];
   for (const set of sets) {
     const text = set.map((hint) => `${theme.fg("accent", hint.key)} ${hint.text}`).join("  ·  ");
-    if (visibleWidth(text) <= width - 4) return text;
+    if (visibleWidth(text) <= innerWidth - 2) return text;
   }
   return "";
 }
@@ -187,37 +186,48 @@ function renderPicker(
   theme: PickerTheme,
 ): string[] {
   const innerWidth = Math.max(1, width - 2);
-  const lines: string[] = [topBorder("Copy", innerWidth, theme), row("", width, theme)];
+  const lines: string[] = [
+    centredRule("Copy", innerWidth, theme, FRAME_TOP, "accent"),
+    row("", innerWidth, theme),
+  ];
 
-  lines.push(row(` ${tabLabels(state, source, theme)}`, width, theme));
-  lines.push(row("", width, theme));
+  lines.push(row(` ${tabLabels(state, source, theme)}`, innerWidth, theme));
+  lines.push(row("", innerWidth, theme));
 
   const items = visibleItems(source, state);
   if (items.length === 0) {
     const message = state.filter === "" ? "Nothing to copy." : `Nothing matches “${state.filter}”.`;
-    lines.push(row(` ${theme.fg("warning", message)}`, width, theme));
+    lines.push(row(` ${theme.fg("warning", message)}`, innerWidth, theme));
   } else {
     const start = windowStart(state.selected, items.length);
     const end = Math.min(items.length, start + MAX_ROWS);
     for (let offset = start; offset < end; offset += 1) {
       const item = items[offset]!;
-      lines.push(row(` ${itemRow(item, offset === state.selected, theme)}`, width, theme));
+      lines.push(row(` ${itemRow(item, offset === state.selected, theme)}`, innerWidth, theme));
     }
     if (items.length > MAX_ROWS) {
-      lines.push(row(` ${theme.fg("dim", `${state.selected + 1}/${items.length}`)}`, width, theme));
+      lines.push(
+        row(` ${theme.fg("dim", `${state.selected + 1}/${items.length}`)}`, innerWidth, theme),
+      );
     }
   }
 
   const notice = pickerNotice(source);
-  if (notice !== undefined) lines.push(row(` ${theme.fg("dim", notice)}`, width, theme));
+  if (notice !== undefined) lines.push(row(` ${theme.fg("dim", notice)}`, innerWidth, theme));
 
   const current = currentItem(source, state);
   if (current !== undefined) {
     const count = bodyLines(current.body).length;
     lines.push(
-      sectionBorder(`Preview · ${count} line${count === 1 ? "" : "s"}`, innerWidth, theme),
+      centredRule(
+        `Preview · ${count} line${count === 1 ? "" : "s"}`,
+        innerWidth,
+        theme,
+        SECTION,
+        "dim",
+      ),
     );
-    lines.push(...previewLines(current, width, theme));
+    lines.push(...previewLines(current, innerWidth, theme));
   }
 
   lines.push(midBorder(innerWidth, theme));
@@ -225,8 +235,8 @@ function renderPicker(
     state.filter === ""
       ? theme.fg("dim", "type to filter · e.g. src, diff, table")
       : `${theme.fg("muted", "filter:")} ${theme.fg("accent", state.filter)}`;
-  lines.push(row(` ${filter}`, width, theme));
-  lines.push(row(` ${helpLine(theme, width)}`, width, theme));
+  lines.push(row(` ${filter}`, innerWidth, theme));
+  lines.push(row(` ${helpLine(theme, innerWidth)}`, innerWidth, theme));
   lines.push(bottomBorder(innerWidth, theme));
   return lines;
 }

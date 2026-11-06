@@ -129,3 +129,7 @@ same bytes. It works in a scratch repository, so nothing under version control c
 report it writes to `docs/verification/` is gitignored, and `.pi/settings.json` is untouched.
 Applying a block is the applier's business — that code lives in your dotfiles, not here — so it
 is out of scope. Re-run it whenever the picker, the hand-off section or the splice changes.
+
+The wizard exits non-zero when a check it can make fails. Anything the run contradicted in
+`docs/handoff-contract.md` is different: it is written into the report and left to you, because
+whether a guarantee held is a judgement about prose, not a check.

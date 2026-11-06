@@ -487,6 +487,8 @@ mkdir -p "$REPO/docs/verification"
   printf '| Reflow acceptable | %s |\n\n' "$REFLOW_ACCEPTABLE"
   printf '## Reflow\n\n%s\n\n' "$REFLOW"
   printf '## What the contract must change\n\n%s\n\n' "$CONTRADICTIONS"
+  printf 'This answer does not affect the result above: it is a judgement for whoever reads\n'
+  printf 'this report, and the fix belongs in `docs/handoff-contract.md`.\n\n'
   printf '## Environment\n\n'
   printf -- '- pi: %s\n' "$PI_VERSION"
   printf -- '- node: %s\n' "$NODE_VERSION"

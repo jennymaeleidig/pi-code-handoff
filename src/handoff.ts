@@ -100,6 +100,12 @@ export function diffCaption(path: string, hunks: number): string {
   return `\`${path}\` — ${plural(hunks, "hunk")}`;
 }
 
+/** What a block is, in a word, for the picker's list. */
+export function blockBadge(block: HandoffBlock): string {
+  if (block.kind === "command") return "cmd";
+  return block.form ?? "diff";
+}
+
 export function fullCaption(path: string, created: boolean, lines: number): string {
   return `\`${path}\` — ${created ? "new file" : "full file"}, ${plural(lines, "line")}`;
 }
