@@ -211,10 +211,20 @@ export function countDiff(diff: string): Counts {
   let hunks = 0;
   let insertions = 0;
   let deletions = 0;
+  let inHunk = false;
   for (const line of diff.split("\n")) {
-    if (line.startsWith("@@ ")) hunks += 1;
-    else if (line.startsWith("+") && !line.startsWith("+++ ")) insertions += 1;
-    else if (line.startsWith("-") && !line.startsWith("--- ")) deletions += 1;
+    if (line.startsWith("@@ ")) {
+      hunks += 1;
+      inHunk = true;
+    } else if (!inHunk) {
+      // The `---`/`+++` file headers sit before the first hunk. A content
+      // line that begins `+++ ` is inside a hunk, so it still counts.
+      continue;
+    } else if (line.startsWith("+")) {
+      insertions += 1;
+    } else if (line.startsWith("-")) {
+      deletions += 1;
+    }
   }
   return { hunks, insertions, deletions };
 }

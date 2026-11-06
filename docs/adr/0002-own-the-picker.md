@@ -51,6 +51,7 @@ Rejected:
 
 ## Work
 
-The fence scanner is #9 and the picker is #10; #10's body carries the follow-ups that expire
-this ADR's claims (the contract's "not yet shipped" caveat, the `GLOSSARY.md` tense) and the
-live verification that decides whether the external clipper can be removed.
+The fence scanner shipped as #9 and the picker as #10. #10 also expired the follow-ups these
+claims listed: the contract's "not yet shipped" caveat is gone and `GLOSSARY.md` states the
+picker in the present tense. Whether the external clipper can now be removed is the live
+verification in #8.

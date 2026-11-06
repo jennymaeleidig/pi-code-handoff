@@ -65,8 +65,13 @@ _Avoid_: Clip, copy menu
 
 **Hand-off tab**:
 The picker's default tab: this reply's hand-off blocks by caption, each copied as its bare
-body.
+body — its payload.
 _Avoid_: Block list, picker list
+
+**Payload**:
+The exact text a picker item copies: a hand-off block's body alone, without its caption or
+fences; on the parsed tab, the block's source markdown.
+_Avoid_: Content, clipboard text
 
 **Parsed tab**:
 The picker's second tab: the reply's own fenced code, tables, lists and blockquotes, read

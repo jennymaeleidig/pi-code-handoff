@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { scanFenceSpans } from "../src/fences.ts";
 import { makeRepo, remove } from "./helpers.ts";
 
 interface RunResult {
@@ -44,32 +45,6 @@ function run(
       resolve({ code: code ?? -1, stdout, stderr });
     });
   });
-}
-
-interface ScannerBlock {
-  lang: string;
-  body: string;
-}
-
-/** The picker's view: every fenced block, with fences longer than three. */
-function scanFences(text: string): ScannerBlock[] {
-  const blocks: ScannerBlock[] = [];
-  const lines = text.split("\n");
-  for (let index = 0; index < lines.length; index++) {
-    const open = /^(`{3,})(.*)$/.exec(lines[index]!);
-    if (!open) continue;
-    const fence = open[1]!;
-    const body: string[] = [];
-    let end = index + 1;
-    for (; end < lines.length; end++) {
-      if (lines[end] === fence) break;
-      body.push(lines[end]!);
-    }
-    if (end >= lines.length) break;
-    blocks.push({ lang: open[2]!.trim(), body: body.join("\n") });
-    index = end;
-  }
-  return blocks;
 }
 
 test("the real pi binary persists the spliced hand-off section", { timeout: 120_000 }, async () => {
@@ -130,7 +105,7 @@ test("the real pi binary persists the spliced hand-off section", { timeout: 120_
       .map((block) => block.text ?? "")
       .join("\n");
 
-    const blocks = scanFences(text);
+    const blocks = scanFenceSpans(text);
     assert.equal(blocks.length, 2, `expected two blocks in:\n${text}`);
     assert.deepEqual(
       blocks.map((block) => block.lang),
@@ -140,7 +115,7 @@ test("the real pi binary persists the spliced hand-off section", { timeout: 120_
     assert.match(blocks[1]!.body, /b\.txt/);
     assert.ok(
       blocks[0]!.body.endsWith("\n"),
-      "the picker payload must be a newline-terminated patch",
+      "the whole-reply block must be a newline-terminated patch",
     );
 
     const aCaptions = text.match(/`a\.txt`/g) ?? [];

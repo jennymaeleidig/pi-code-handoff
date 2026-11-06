@@ -73,16 +73,30 @@ export function lastReply(entries: readonly SessionEntryLike[]): Reply | undefin
   return undefined;
 }
 
-function isHandoffBlock(value: unknown): value is HandoffBlock {
-  if (typeof value !== "object" || value === null) return false;
+function handoffBlockOf(value: unknown): HandoffBlock | undefined {
+  if (typeof value !== "object" || value === null) return undefined;
   const block = value as Record<string, unknown>;
-  return (
-    typeof block.toolCallId === "string" &&
-    (block.kind === "code" || block.kind === "command") &&
-    typeof block.body === "string" &&
-    typeof block.lang === "string" &&
-    typeof block.caption === "string"
-  );
+  if (
+    typeof block.toolCallId !== "string" ||
+    (block.kind !== "code" && block.kind !== "command") ||
+    typeof block.body !== "string" ||
+    typeof block.lang !== "string" ||
+    typeof block.caption !== "string"
+  ) {
+    return undefined;
+  }
+  // Rebuilding the block, rather than asserting its type, makes a new required
+  // field on HandoffBlock a compile error here instead of a silent bypass.
+  return {
+    toolCallId: block.toolCallId,
+    kind: block.kind,
+    ...(block.form === "diff" || block.form === "full" ? { form: block.form } : {}),
+    ...(typeof block.path === "string" ? { path: block.path } : {}),
+    ...(typeof block.purpose === "string" ? { purpose: block.purpose } : {}),
+    body: block.body,
+    lang: block.lang,
+    caption: block.caption,
+  };
 }
 
 /**
@@ -102,8 +116,9 @@ export function storedBlocks(
     const data = entry.data as StoredHandoff | undefined;
     if (data === undefined || data === null || !Array.isArray(data.blocks)) continue;
     if (messageTimestamp(data.messageTimestamp) !== timestamp) continue;
-    if (!data.blocks.every(isHandoffBlock)) continue;
-    return data.blocks;
+    const blocks = data.blocks.map(handoffBlockOf);
+    if (blocks.some((block) => block === undefined)) continue;
+    return blocks as HandoffBlock[];
   }
   return undefined;
 }

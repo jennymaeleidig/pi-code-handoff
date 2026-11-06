@@ -15,8 +15,8 @@ export interface HandoffBlock {
   caption: string;
 }
 
-export const APPENDED_NOTE =
-  "The block is appended to your reply by the harness; do not write it yourself.";
+export const SPLICED_NOTE =
+  "The harness splices the block into your reply; do not write it yourself.";
 
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;

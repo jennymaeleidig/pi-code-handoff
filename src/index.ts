@@ -12,7 +12,7 @@ import { type Static, Type } from "typebox";
 import { countDiff, splitText, unifiedDiff } from "./diff.ts";
 import { checkCommand, checkPatch, repositoryRoot } from "./git.ts";
 import {
-  APPENDED_NOTE,
+  SPLICED_NOTE,
   commandCaption,
   diffCaption,
   fullCaption,
@@ -101,7 +101,10 @@ async function buildBlock(
   claimedPaths: Set<string>,
 ): Promise<BlockResult> {
   if (params.kind === "command") {
-    rejectPresent(params, ["path", "form", "replacements", "content", "patch"]);
+    if (params.form !== undefined) {
+      throw new Error('A command block has no form; "diff" and "full" apply to code blocks only.');
+    }
+    rejectPresent(params, ["path", "replacements", "content", "patch"]);
     const command = requireText(params.command, "command", "command");
     const purpose = requireText(params.purpose, "purpose", "command");
     if (purpose.includes("\n")) {
@@ -117,7 +120,7 @@ async function buildBlock(
         lang: "bash",
         caption: commandCaption(purpose),
       },
-      verdict: `Validated command "${purpose}": bash -n passed. ${APPENDED_NOTE}`,
+      verdict: `Validated command "${purpose}": bash -n passed. ${SPLICED_NOTE}`,
     };
   }
 
@@ -174,11 +177,14 @@ async function buildCodeBlock(
       );
     }
     const content = params.content ?? "";
-    if (content !== "" && !content.endsWith("\n")) {
+    if (content === "") {
+      throw new Error(`form "full" content for "${path}" is empty; supply the file's text.`);
+    }
+    if (!content.endsWith("\n")) {
       throw new Error(
-        'form "full" content must end with a newline (an empty file is the one exception), ' +
-          'because a fenced Markdown body cannot hold a final line without one. Use form "diff" ' +
-          "or a /dev/null patch to preserve a missing trailing newline.",
+        'form "full" content must end with a newline, because a fenced Markdown body ' +
+          'cannot hold a final line without one. Use form "diff" or a /dev/null patch ' +
+          "to preserve a missing trailing newline.",
       );
     }
     const lines = splitText(content).lines.length;
@@ -194,7 +200,7 @@ async function buildCodeBlock(
       },
       verdict:
         `Validated ${path}: ${exists ? "full file" : "new file"}, ${plural(lines, "line")}. ` +
-        APPENDED_NOTE,
+        SPLICED_NOTE,
     };
   }
 
@@ -231,7 +237,17 @@ async function buildCodeBlock(
       );
     }
     oldText = creates ? "" : await readFile(absolute, "utf8");
-    const newText = applyHunks(oldText, parsed.hunks);
+    let newText: string;
+    try {
+      newText = applyHunks(oldText, parsed.hunks);
+    } catch (error) {
+      // A patch git can read gets git's own words even when this package's
+      // stricter applier refused it first; a bare hunk has no headers to check.
+      if (/^--- /m.test(params.patch) && /^\+\+\+ /m.test(params.patch)) {
+        await checkPatch(root, params.patch);
+      }
+      throw error;
+    }
     if (newText === oldText) throw new Error(`The patch leaves "${path}" unchanged.`);
     return await diffResult(toolCallId, path, oldText, newText, root);
   }
@@ -283,14 +299,13 @@ async function diffResult(
     verdict:
       `Validated ${path}: ${plural(counts.hunks, "hunk")}, ` +
       `${plural(counts.insertions, "insertion")}, ${plural(counts.deletions, "deletion")}. ` +
-      `git apply --check passed. ${APPENDED_NOTE}`,
+      `git apply --check passed. ${SPLICED_NOTE}`,
   };
 }
 
 /**
- * The blocks for the last reply: this session's memory first — byte-identical
- * to what validation accepted — then the entry written to the session (a
- * `/reload` or a resume), then nothing, so the parsed tab takes over.
+ * The picker for the last reply: `replyBlocks` picks the blocks, `pickerFor`
+ * picks the tab. A reply with no blocks still opens, so the notice can say so.
  */
 async function openCopyPicker(
   ctx: ExtensionContext,
@@ -418,7 +433,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     label: "Copy Paste",
     description:
       "Validate a change, then append a copyable hand-off block to your reply. " +
-      `${APPENDED_NOTE} ` +
+      `${SPLICED_NOTE} ` +
       'For kind "code", pass a repo-relative or absolute path and exactly one of: "replacements" ' +
       '(search/replace pairs, each matching the file exactly once), "content" (the whole file; form "full" ' +
       'emits it entire, form "diff" diffs it against the file on disk), ' +
@@ -428,7 +443,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       "The target must be inside a git repository. On failure the applier's own error comes back so you can repair in this turn. " +
       "One block per path per reply.",
     promptSnippet: "Validate a change and append a copyable hand-off block",
-    promptGuidelines: [`Use copy_paste to hand off code or shell commands. ${APPENDED_NOTE}`],
+    promptGuidelines: [`Use copy_paste to hand off code or shell commands. ${SPLICED_NOTE}`],
     parameters: schema,
     async execute(
       toolCallId: string,

@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
+import { countDiff } from "../src/diff.ts";
 import { makeDirectory, makeRepo, remove, git, loadExtension, blockBody } from "./helpers.ts";
+
+test("the counts include a content line that starts like a file header", () => {
+  const diff = "--- a/a.txt\n+++ b/a.txt\n@@ -1 +1,2 @@\n one\n+++ inserted\n";
+  assert.deepEqual(countDiff(diff), { hunks: 1, insertions: 1, deletions: 0 });
+});
 
 test("registers copy_paste and a message_end handler", () => {
   const harness = loadExtension("/tmp");
@@ -38,7 +44,7 @@ test("code+diff emits a counted, validated diff and the splice carries it", asyn
     );
     assert.ok(
       blockBody(section!).endsWith("\n"),
-      "the picker payload must keep the patch's newline",
+      "the whole-reply section must keep the patch's trailing newline",
     );
   } finally {
     await remove(repo);
@@ -139,7 +145,7 @@ test("command+form is rejected as meaningless", async () => {
       purpose: "say hi",
     });
     assert.equal(result.isError, true);
-    assert.match(result.content[0]!.text, /form does not apply/);
+    assert.match(result.content[0]!.text, /A command block has no form/);
   } finally {
     await remove(repo);
   }
@@ -362,7 +368,23 @@ test("an escape-hatch /dev/null patch creates a new file", async () => {
   }
 });
 
-test("a patch whose context does not match is refused", async () => {
+test("a patch with headers whose context does not match returns git's own error", async () => {
+  const repo = await makeRepo({ "src/a.ts": "one\ntwo\nthree\n" });
+  try {
+    const harness = loadExtension(repo);
+    const result = await harness.execute("call-1", {
+      kind: "code",
+      path: "src/a.ts",
+      patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,3 +1,3 @@\n one\n-NOPE\n+TWO\n three\n",
+    });
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /patch does not apply/);
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("a bare-hunk patch whose context does not match names the line", async () => {
   const repo = await makeRepo({ "src/a.ts": "one\ntwo\nthree\n" });
   try {
     const harness = loadExtension(repo);
@@ -566,7 +588,67 @@ test("a multi-file patch is refused", async () => {
   }
 });
 
-test("an empty full file yields an empty picker payload", async () => {
+test("each refusal names its own rule", async () => {
+  const repo = await makeRepo({ "src/a.ts": "one\n" });
+  try {
+    const harness = loadExtension(repo);
+    const cases: Array<[string, Record<string, unknown>, RegExp]> = [
+      [
+        "missing purpose",
+        { kind: "command", command: "echo hi" },
+        /purpose is required when kind is "command"/,
+      ],
+      [
+        "empty command",
+        { kind: "command", command: "", purpose: "say hi" },
+        /command is required when kind is "command"/,
+      ],
+      [
+        "missing target",
+        { kind: "code", path: "src/missing.ts", replacements: [{ search: "a", replace: "b" }] },
+        /"src\/missing\.ts" does not exist/,
+      ],
+      [
+        "empty replacements",
+        { kind: "code", path: "src/a.ts", replacements: [] },
+        /"replacements" is empty/,
+      ],
+      [
+        "no-op replacements",
+        { kind: "code", path: "src/a.ts", replacements: [{ search: "one", replace: "one" }] },
+        /replacements leave "src\/a\.ts" unchanged/,
+      ],
+      [
+        "patch deletes the file",
+        {
+          kind: "code",
+          path: "src/a.ts",
+          patch: "--- a/src/a.ts\n+++ /dev/null\n@@ -1 +0,0 @@\n-one\n",
+        },
+        /Deleting a file with a patch is not supported/,
+      ],
+      [
+        "patch creates an existing file",
+        {
+          kind: "code",
+          path: "src/a.ts",
+          patch: "--- /dev/null\n+++ b/src/a.ts\n@@ -0,0 +1 @@\n+two\n",
+        },
+        /The patch creates "src\/a\.ts", but the file already exists/,
+      ],
+    ];
+
+    for (const [name, params, expected] of cases) {
+      const result = await harness.execute("call-1", params);
+      assert.equal(result.isError, true, `${name}: expected an error`);
+      assert.match(result.content[0]!.text, expected, name);
+    }
+  } finally {
+    await remove(repo);
+  }
+});
+
+test("empty full content is refused with an error naming the rule", async () => {
   const repo = await makeRepo();
   try {
     const harness = loadExtension(repo);
@@ -576,10 +658,8 @@ test("an empty full file yields an empty picker payload", async () => {
       form: "full",
       content: "",
     });
-    assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    assert.match(section!, /`empty\.txt` — new file, 0 lines\n\n```\n```/);
-    assert.equal(blockBody(section!), "");
+    assert.equal(result.isError, true);
+    assert.match(result.content[0]!.text, /content for "empty\.txt" is empty/);
   } finally {
     await remove(repo);
   }
