@@ -108,12 +108,19 @@ function row(content: string, innerWidth: number, theme: PickerTheme): string {
   return theme.fg("border", "│") + text + theme.fg("border", "│");
 }
 
-function tabLabels(state: PickerState, theme: PickerTheme): string {
-  const label = (tab: "handoff" | "parsed", name: string) =>
-    state.tab === tab
-      ? theme.underline(theme.fg("accent", theme.bold(name)))
-      : theme.fg("dim", name);
-  return `${label("handoff", "Hand-off")}  ${label("parsed", "Agent reply")}`;
+function tabLabels(state: PickerState, source: PickerSource, theme: PickerTheme): string {
+  // The count trails the name, so a bare digit is never read as a key to press.
+  const label = (tab: "handoff" | "parsed", name: string, count: number) => {
+    const text = `${name} ${count}`;
+    return state.tab === tab
+      ? theme.underline(theme.fg("accent", theme.bold(text)))
+      : theme.fg("dim", text);
+  };
+  return `${label("handoff", "Hand-off", source.handoff.length)}  ${label(
+    "parsed",
+    "Agent reply",
+    source.parsed.length,
+  )}`;
 }
 
 function itemRow(item: PickerItem, selected: boolean, theme: PickerTheme): string {
@@ -183,7 +190,7 @@ function renderPicker(
     row("", innerWidth, theme),
   ];
 
-  lines.push(row(` ${tabLabels(state, theme)}`, innerWidth, theme));
+  lines.push(row(` ${tabLabels(state, source, theme)}`, innerWidth, theme));
   lines.push(row("", innerWidth, theme));
 
   const items = visibleItems(source, state);

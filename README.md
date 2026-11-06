@@ -81,6 +81,9 @@ tab** when this reply has validated blocks, and on the Agent reply tab when it d
 - Type to filter; `backspace` erases.
 - `tab` toggles to the **Agent reply tab**, `1` and `2` jump straight to either.
 
+Each tab states how many blocks it holds, and the list's foot carries the position when there
+is more than one to step through.
+
 The hand-off tab copies the block's body and nothing else: a diff arrives on the clipboard as a
 bare patch, with no fences to strip. A preview under the list shows the highlighted block's
 first lines, so two similarly named paths are told apart before `enter`, and a `2/5` counter at
