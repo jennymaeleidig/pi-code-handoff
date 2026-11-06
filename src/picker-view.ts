@@ -128,11 +128,12 @@ function tabLabels(
     (name: string, count: number) => `${name} [${count}]`,
     (name: string, count: number) => `${name} ${count}`,
   ];
+  const separator = " · ";
   for (const form of forms) {
     const handoff = form("Hand-off", source.handoff.length);
     const parsed = form("Agent reply", source.parsed.length);
-    if (visibleWidth(`${handoff}  ${parsed}`) <= innerWidth - 2) {
-      return `${paint("handoff", handoff)}  ${paint("parsed", parsed)}`;
+    if (visibleWidth(`${handoff}${separator}${parsed}`) <= innerWidth - 2) {
+      return `${paint("handoff", handoff)}${theme.fg("dim", separator)}${paint("parsed", parsed)}`;
     }
   }
   return "";
