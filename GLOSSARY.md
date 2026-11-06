@@ -81,8 +81,9 @@ _Avoid_: Content, clipboard text
 
 **Agent reply tab**:
 The picker's second tab, keyed `parsed` in the code: the reply's own fenced code, tables, lists
-and blockquotes, read back out of the message text. The fallback when the hand-off tab has
-nothing.
+and blockquotes, read back out of the message text, followed by the whole reply as one item.
+That item is a copy of the message rather than one of its blocks, so it is not counted in the
+tab's total. The fallback when the hand-off tab has nothing.
 _Avoid_: Parsed tab, raw view, fallback tab
 
 **Fence length**:

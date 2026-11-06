@@ -25,6 +25,7 @@ import {
   type PickerItem,
   pickerNotice,
   type PickerSource,
+  parsedBlockCount,
   type PickerState,
   switchTab,
   typeFilter,
@@ -131,7 +132,7 @@ function tabLabels(
   const separator = " · ";
   for (const form of forms) {
     const handoff = form("Hand-off", source.handoff.length);
-    const parsed = form("Agent reply", source.parsed.length);
+    const parsed = form("Agent reply", parsedBlockCount(source));
     if (visibleWidth(`${handoff}${separator}${parsed}`) <= innerWidth - 2) {
       return `${paint("handoff", handoff)}${theme.fg("dim", separator)}${paint("parsed", parsed)}`;
     }

@@ -20,6 +20,9 @@ export interface PickerItem {
   body: string;
   /** The bytes live in the block, not in this tag; the tag only names them for the list. */
   badge?: string;
+  /** Set on the Agent reply tab's last item: the whole reply, which is a copy of the
+   * message rather than one of its blocks, so it does not count towards the tab. */
+  whole?: true;
 }
 
 export interface PickerSource {
@@ -53,7 +56,10 @@ export function parsedItems(text: string): PickerItem[] {
   // Last, so the blocks themselves stay the first thing under the cursor; this
   // is the way out when nothing else on offer is the thing you want.
   const lines = (text.endsWith("\n") ? text.slice(0, -1) : text).split(/\r\n|\r|\n/).length;
-  return [...blocks, { label: `[md] — full response, ${plural(lines, "line")}`, body: text }];
+  return [
+    ...blocks,
+    { label: `[md] — full response, ${plural(lines, "line")}`, body: text, whole: true as const },
+  ];
 }
 
 export function pickerSource(blocks: readonly HandoffBlock[], text: string): PickerSource {
@@ -68,6 +74,11 @@ export function pickerFor(
   const reply = lastReply(branch);
   if (reply === undefined) return undefined;
   return pickerSource(replyBlocks(branch, reply, memory), reply.text);
+}
+
+/** The Agent reply tab's blocks; the whole-reply item is a copy, not one of them. */
+export function parsedBlockCount(source: PickerSource): number {
+  return source.parsed.filter((item) => item.whole !== true).length;
 }
 
 /** Open on hand-off when it has something; on parsed when it does not. */
