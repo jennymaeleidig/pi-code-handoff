@@ -30,7 +30,16 @@ pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --
 
 ## Install
 
-From this checkout:
+The usual way, from anywhere — pi clones the repository and reconciles the tag:
+
+```sh
+pi install git:github.com/jennymaeleidig/pi-copy-paste@v1.0.0
+```
+
+A tag or commit pins the install; omit it to follow the default branch. This is a personal
+install, recorded in `~/.pi/agent/settings.json`, so it loads in every project.
+
+From a checkout, which is what you want while changing the extension:
 
 ```sh
 pi install "$PWD"          # personal install, recorded in ~/.pi/agent/settings.json
@@ -43,8 +52,8 @@ rather than against the shell you typed it in. `pi -e` caches the extension unde
 `~/.pi/agent/tmp/extensions/` and writes nothing to settings.
 
 An installed package loads on the next start, and `/reload` picks it up in a running session.
-`pi list` shows what is configured, and `pi remove <source>` undoes an install. A project
-install only loads once project trust is granted.
+`pi list` shows what is configured, `pi update --extensions` reconciles a git install, and
+`pi remove <source>` undoes one. A project install only loads once project trust is granted.
 
 ## Ask for a hand-off
 
