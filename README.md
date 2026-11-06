@@ -120,6 +120,7 @@ Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, 
 
 `scripts/verify-live.sh` walks a human through the part a test cannot reach: install the
 extension in a real session, hand off a change, pick the block with the picker, apply it with
-your own applier, and record what happened. It works in a scratch repository, touches no
-checkout and no `.pi/settings.json`, and writes its findings to `docs/verification/`. Re-run it
-whenever the picker, the applier or the splice changes.
+your own applier, and record what happened. It works in a scratch repository, so nothing
+under version control changes except the report it writes to `docs/verification/`, and
+`.pi/settings.json` is untouched. Re-run it whenever the picker, the applier or the splice
+changes.

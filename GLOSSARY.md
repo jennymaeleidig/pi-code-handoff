@@ -25,6 +25,11 @@ Placing a hand-off block into the assistant message itself, so the bytes validat
 bytes picked are one object.
 _Avoid_: Append, inject, patch message
 
+**Reflow**:
+What the screen does when the spliced hand-off section replaces the message at the end of a
+turn — a jump, a scroll, a repaint — and whether it is acceptable.
+_Avoid_: Repaint, flicker, re-render
+
 **Kind**:
 What a block carries: code or command.
 _Avoid_: Type, category

@@ -215,18 +215,35 @@ show_prefix() {
 }
 
 # ask_yes_no "prompt" [previous]: asks until the answer is yes or no. Only the
-# answer reaches stdout, so it can be captured in a command substitution.
+# answer reaches stdout, so it can be captured in a command substitution. A
+# closed stdin ends the wizard rather than looping on an unanswerable prompt.
 ask_yes_no() {
   local prompt="$1" default="${2:-}" answer=""
   while true; do
     printf '  %s? %s%s ' "$YELLOW" "$prompt" "${default:+ [keep: $default]}" >&2
-    read -r answer || answer=""
+    if ! read -r answer; then
+      printf '\n' >&2
+      warn "no answer on stdin; stopping" >&2
+      return 1
+    fi
     [[ -z "$answer" ]] && answer="$default"
     case "$answer" in
       yes|no) printf '%s' "$answer"; return 0 ;;
     esac
     warn "answer yes or no" >&2
   done
+}
+
+# clip_write: replaces the clipboard with this script's stdin, so a payload left
+# over from an earlier run cannot pass the checks below.
+clip_write() {
+  if   command -v pbcopy        >/dev/null 2>&1; then pbcopy
+  elif command -v wl-copy       >/dev/null 2>&1; then wl-copy
+  elif command -v xclip         >/dev/null 2>&1; then xclip -selection clipboard
+  elif command -v powershell.exe >/dev/null 2>&1; then
+    powershell.exe -NoProfile -Command 'Set-Clipboard -Value ""'
+  else return 1
+  fi
 }
 
 # clip_into FILE: the clipboard payload, byte for byte, or an empty FILE.
@@ -244,16 +261,30 @@ run_wizard() {
 TOTAL_STAGES=7
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-STATE="${PI_COPY_PASTE_VERIFY_STATE:-${TMPDIR:-/tmp}/pi-copy-paste-verify}"
+TMP_ROOT="${TMPDIR:-/tmp}"
+STATE="${PI_COPY_PASTE_VERIFY_STATE:-${TMP_ROOT%/}/pi-copy-paste-verify}"
 SCRATCH="$STATE/repo"
 ENV_FILE="$STATE/state.env"
-REPORT="$REPO/docs/verification/live-$(date +%Y-%m-%d-%H%M).md"
+REPORT="$REPO/docs/verification/live-$(date +%Y-%m-%d-%H%M%S).md"
 mkdir -p "$STATE"
 
 banner "Live verification: a hand-off block through a real applier"
 
+# A version string, or "not on PATH", so each tool is looked up once.
+version_of() {
+  local out
+  if ! command -v "$1" >/dev/null 2>&1; then
+    printf 'not on PATH'
+    return
+  fi
+  out=$("$1" --version 2>/dev/null | head -n1 || true)
+  [[ -z "$out" ]] && out="present"
+  printf '%s' "$out"
+}
+
 stage "Preflight and the scratch repository"
-say "The run happens against a scratch repo, so this checkout is never touched."
+say "The run happens in a scratch repo. Nothing under version control changes,"
+say "apart from the report the last stage writes."
 note "  scratch:    $SCRATCH"
 note "  extension:  $REPO/src/index.ts"
 if [[ -f "$REPO/src/index.ts" ]]; then
@@ -261,53 +292,48 @@ if [[ -f "$REPO/src/index.ts" ]]; then
 else
   warn "$REPO/src/index.ts is missing; run this from a checkout of the package"
 fi
+PI_VERSION=$(version_of pi)
+GIT_VERSION=$(version_of git)
+NODE_VERSION=$(version_of node)
 for bin in pi git node; do
-  if command -v "$bin" >/dev/null 2>&1; then
-    note "$bin: $("$bin" --version 2>/dev/null | head -n1)"
-  else
+  case "$bin" in
+    pi) version=$PI_VERSION ;;
+    git) version=$GIT_VERSION ;;
+    node) version=$NODE_VERSION ;;
+  esac
+  note "$bin: $version"
+  if [[ "$version" == "not on PATH" ]]; then
     warn "$bin is not on PATH; the stages that need it will not work"
   fi
 done
-PI_VERSION="unknown"
-if command -v pi >/dev/null 2>&1; then
-  PI_VERSION=$(pi --version 2>/dev/null | head -n1 || true)
-  [[ -z "$PI_VERSION" ]] && PI_VERSION="unknown"
+# Always start from the seeded tree: a tree still carrying the last run's applied
+# changes would let this run's checks pass without anything being pasted.
+if [[ -d "$SCRATCH" ]]; then
+  rm -rf "$SCRATCH"
+  note "✓ cleared the previous scratch tree"
 fi
-NODE_VERSION="unknown"
-if command -v node >/dev/null 2>&1; then
-  NODE_VERSION=$(node --version 2>/dev/null | head -n1 || true)
-  [[ -z "$NODE_VERSION" ]] && NODE_VERSION="unknown"
-fi
-if [[ -d "$SCRATCH/.git" ]]; then
-  if confirm "Reset the scratch repository and start from a clean tree?"; then
-    rm -rf "$SCRATCH"
-  fi
-fi
-if [[ ! -d "$SCRATCH/.git" ]]; then
-  mkdir -p "$SCRATCH/src"
-  git -C "$SCRATCH" init -q
-  cat > "$SCRATCH/src/greeting.ts" <<'TS'
+mkdir -p "$SCRATCH/src"
+git -C "$SCRATCH" init -q
+cat > "$SCRATCH/src/greeting.ts" <<'TS'
 export function greet(name: string): string {
   return `Hello, ${name}!`;
 }
 TS
-  git -C "$SCRATCH" add -A
-  git -C "$SCRATCH" -c user.email=verify@example.com -c user.name=verify \
-    commit -qm "Seed the verification repo"
-  note "✓ seeded $SCRATCH/src/greeting.ts"
-fi
+git -C "$SCRATCH" add -A
+git -C "$SCRATCH" -c user.email=verify@example.com -c user.name=verify \
+  -c commit.gpgsign=false commit -qm "Seed the verification repo"
+note "✓ seeded $SCRATCH/src/greeting.ts"
 cat > "$STATE/prompt.txt" <<'TXT'
 Rename the exported function greet to greeting in src/greeting.ts, and create
 src/index.ts that re-exports greeting with an explicit return type. Hand both off
 with copy_paste. Do not edit the files yourself.
 TXT
-say "Reset by hand any time with: rm -rf $SCRATCH"
 note "the request to send is in $STATE/prompt.txt"
 pause
 
 stage "Hand off the change"
 say "In a second terminal or pane, start pi on the scratch repo:"
-step "cd $SCRATCH && pi -e $REPO/src/index.ts"
+step "cd \"$SCRATCH\" && pi -e \"$REPO/src/index.ts\""
 say "Then send the request in $STATE/prompt.txt (print it with: cat $STATE/prompt.txt):"
 note "    Rename the exported function greet to greeting in src/greeting.ts, and"
 note "    create src/index.ts that re-exports greeting with an explicit return type."
@@ -317,7 +343,8 @@ step "one for src/greeting.ts, fenced diff, caption 'N hunk'"
 step "one for src/index.ts, fenced ts, caption 'new file, N lines'"
 note "Leave pi running; the next stages use that session."
 pause "Press Enter once the blocks are in the reply"
-ask HANDOFF_OK "Did that reply hold exactly those two blocks, each from one copy_paste call? [y/n]"
+previous=$( _existing HANDOFF_OK || true )
+HANDOFF_OK=$(ask_yes_no "Were both blocks there, each from one copy_paste call?" "$previous")
 write_env HANDOFF_OK "$HANDOFF_OK"
 
 stage "Pick the diff with the picker"
@@ -326,6 +353,8 @@ step "press Ctrl+Shift+C, or run /copy-paste"
 step "the overlay should open on the Hand-off tab, its items labelled by caption"
 step "choose the src/greeting.ts item and press enter"
 step "watch for the 'Copied ...' notice"
+printf '' | clip_write 2>/dev/null ||
+  warn "could not clear the clipboard; an older payload could still pass the check"
 pause "Press Enter once the block is on the clipboard"
 clip_into "$STATE/picked.txt"
 payload="$(cat "$STATE/picked.txt")"
@@ -347,18 +376,20 @@ else
       warn "the payload does not look like the block's body" ;;
   esac
 fi
-if ends_with_newline "$STATE/picked.txt"; then
-  note "✓ the payload ends with a newline, so git will not call it corrupt"
-else
-  PICKER_PAYLOAD_OK="$PICKER_PAYLOAD_OK (no trailing newline)"
-  warn "the payload does not end with a newline"
+if [[ "$PICKER_PAYLOAD_OK" == yes ]]; then
+  if ends_with_newline "$STATE/picked.txt"; then
+    note "✓ the payload ends with a newline, so git will not call it corrupt"
+  else
+    PICKER_PAYLOAD_OK="no: the payload lost its trailing newline"
+    warn "the payload does not end with a newline"
+  fi
 fi
 write_env PICKER_PAYLOAD_OK "$PICKER_PAYLOAD_OK"
 
 stage "Apply it in your editor"
 say "Paste the patch into your applier and apply it against the scratch repo:"
 step "your applier (vim's :DiffApply, or whatever consumes a patch from the clipboard)"
-step "or plain, as a fallback: cd $SCRATCH && git apply -p1"
+step "or plain, as a fallback: cd \"$SCRATCH\" && git apply -p1"
 pause "Press Enter once it has been applied"
 if grep -q 'export function greeting' "$SCRATCH/src/greeting.ts"; then
   APPLIED_OK=yes
@@ -373,6 +404,9 @@ stage "The whole-reply path"
 say "Back in the pi session, on the same reply:"
 step "press Ctrl+X (or run /copy) with nothing selected in fullscreen mode"
 say "That copies the whole reply, fences and all."
+printf '' | clip_write 2>/dev/null ||
+  warn "could not clear the clipboard; the reply check may read an older payload"
+pause "Press Enter once the reply has been copied"
 clip_into "$STATE/reply.txt"
 reply="$(cat "$STATE/reply.txt")"
 if [[ -n "$reply" ]]; then
