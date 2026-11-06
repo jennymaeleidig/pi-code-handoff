@@ -115,3 +115,11 @@ validate, and that is the whole of its authority.
 
 Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, or
 `npm run format:check`. `AGENTS.md` covers loading the working copy for a session.
+
+### Live verification
+
+`scripts/verify-live.sh` walks a human through the part a test cannot reach: install the
+extension in a real session, hand off a change, pick the block with the picker, apply it with
+your own applier, and record what happened. It works in a scratch repository, touches no
+checkout and no `.pi/settings.json`, and writes its findings to `docs/verification/`. Re-run it
+whenever the picker, the applier or the splice changes.
