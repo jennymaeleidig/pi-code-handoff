@@ -8,7 +8,7 @@ it. The extension never writes to the target repository and never applies anythi
 you:    Move parseKey into src/keys.ts and hand it off.
 
 pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --check passed.
-        Validated src/keys.ts: full file, 18 lines.
+        Validated src/keys.ts: new file, 18 lines.
 
         ## Hand-off
 
@@ -27,20 +27,21 @@ pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --
 
 ## Install
 
-From this checkout, one of:
+From this checkout:
 
 ```sh
-pi install ./pi-copy-paste          # personal: writes ~/.pi/agent/settings.json
-pi install --local ./pi-copy-paste  # this project: writes .pi/settings.json
-pi -e ./pi-copy-paste/src/index.ts  # one run only, nothing written
+pi install "$PWD"          # personal install, recorded in ~/.pi/agent/settings.json
+pi install --local "$PWD"  # this project, recorded in .pi/settings.json
+pi -e ./src/index.ts       # one run only, with no install recorded
 ```
 
-An installed package loads on the next start; `/reload` picks it up in a running session.
-`pi list` shows what is configured, and `pi remove <source>` undoes an install.
+An absolute path, because a relative local path in a settings file resolves against that file
+rather than against the shell you typed it in. `pi -e` caches the extension under
+`~/.pi/agent/tmp/extensions/` and writes nothing to settings.
 
-A project install (`.pi/settings.json`) only loads after project trust is granted. Adding
-`./pi-copy-paste` to this repository's own `.pi/settings.json` is a temporary dogfooding
-harness, not repo state — revert it before committing.
+An installed package loads on the next start, and `/reload` picks it up in a running session.
+`pi list` shows what is configured, and `pi remove <source>` undoes an install. A project
+install only loads once project trust is granted.
 
 ## Ask for a hand-off
 
@@ -56,12 +57,14 @@ The tool validates before it emits, so a block in the reply is a block that alre
 | ----------------------------------- | -------------------------------------------------- |
 | `replacements`, or `content` diffs  | `diff` — counted hunks, `git apply --check -p1` ok |
 | `content` with `form: "full"`       | the whole file, for a new file or a rewrite        |
+| `patch` — raw unified-diff hunks    | `diff` — recounted, re-headed, and checked         |
 | `command` with a one-line `purpose` | a `bash` block that passed `bash -n`               |
 
-If validation fails, the assistant gets git's or bash's own error back and repairs inside the
-same turn instead of handing you a block that will not apply. The target has to sit inside a
-git repository. One block per path per reply: the second block for the same file would be a
-guess about a file the first block is about to change.
+If validation fails, the assistant gets the failure back inside the same turn — this package's
+refusal, or git's and bash's own words when they have them — and repairs instead of handing you
+a block that will not apply. The target must sit inside a git repository. One block per path
+per reply: the second block for the same file would be a guess about a file the first block is
+about to change.
 
 Every block carries a one-line caption above its fence naming the path it touches, or the
 purpose of the command it carries. That caption is what the picker lists.
@@ -69,16 +72,18 @@ purpose of the command it carries. That caption is what the picker lists.
 ## Take the block
 
 **The picker.** Press `Ctrl+Shift+C` or run `/copy-paste`. The overlay opens on the **hand-off
-tab**, listing this reply's validated blocks by caption.
+tab** when this reply has validated blocks, and on the parsed tab when it does not.
 
 - `↑` `↓` move, `enter` copies, `esc` cancels.
 - Type to filter; `backspace` erases.
 - `tab` toggles to the **parsed tab**, `1` and `2` jump straight to either.
 
 The hand-off tab copies the block's body and nothing else: a diff arrives on the clipboard as a
-bare patch, with no fences to strip. The parsed tab is the fallback for a reply whose hand-off
-list is not available — a reply from before the install, a resumed session — and it copies
-markdown read back out of the message, fences included.
+bare patch, with no fences to strip. The blocks are restored from the session entry written
+with the reply, so the tab survives `/reload` and a resumed session; it is empty only when
+that entry is missing or does not match the reply — one from before the install, or a message
+with no timestamp — and then the parsed tab is what is left. That tab copies markdown read
+back out of the message, fences included.
 
 **The applier.** What you paste into is yours:
 
@@ -88,34 +93,25 @@ markdown read back out of the message, fences included.
   "new file" when the path does not exist yet.
 - A `command` block is shell: read it, then run it.
 
-**The whole reply.** `/copy` or `Ctrl+X` copies the last assistant message with its fences
-intact. To get a bare patch, strip the leading fence together with its tag line and the
-closing run of backticks. A non-empty block leaves one empty line before its closing fence, so
-the stripped body still ends with the newline a patch needs.
+**The whole reply.** `/copy`, or `Ctrl+X` when nothing is selected in fullscreen mode, copies
+the last assistant message with its fences intact, so the fence handling is the applier's or
+yours. To strip it by hand, drop the leading fence and its tag line, the closing run of
+backticks, and the empty line the block leaves before that run — what remains is the body byte
+for byte, trailing newline included.
 
 ## What a block guarantees
 
-The standing statement is [`docs/handoff-contract.md`](docs/handoff-contract.md); the
-vocabulary is [`GLOSSARY.md`](GLOSSARY.md). In short:
+The standing statement is [`docs/handoff-contract.md`](docs/handoff-contract.md), and the
+vocabulary is [`GLOSSARY.md`](GLOSSARY.md). Read them there rather than in a second summary
+that can drift.
 
-- A `diff` block passes `git apply --check -p1` against the working tree as it stands when the
-  block was produced. A later edit that touches a diffed line or its context makes it fail; an
-  edit elsewhere leaves it applying and possibly losing what the other edit added.
-- A `full` block is non-empty and ends with a newline. A file whose last line has no newline
-  is handed off as a `diff`.
-- A `command` block passes `bash -n`.
-- Fences are computed from the content, so a full-file block containing fences of its own
-  cannot terminate early.
+Two things are worth knowing before you paste. A block is true against the working tree at the
+moment it was produced: a later edit to a diffed line or its context makes it fail, while an
+edit elsewhere leaves it applying and possibly losing what that edit added. And the extension
+neither writes to the repository nor applies anything — it refuses to emit a block it could not
+validate, and that is the whole of its authority.
 
 ## Development
 
-Node 22 (see `mise.toml`).
-
-```sh
-npm install
-npm test              # node --test over test/**/*.test.ts
-npm run typecheck     # tsc --noEmit
-npm run format:check  # prettier
-```
-
-Load the working copy for one session with `pi -e ./src/index.ts`.
+Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, or
+`npm run format:check`. `AGENTS.md` covers loading the working copy for a session.
