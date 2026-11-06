@@ -79,7 +79,8 @@ tab** when this reply has validated blocks, and on the parsed tab when it does n
 - `tab` toggles to the **parsed tab**, `1` and `2` jump straight to either.
 
 The hand-off tab copies the block's body and nothing else: a diff arrives on the clipboard as a
-bare patch, with no fences to strip. The blocks are restored from the session entry written
+bare patch, with no fences to strip. A preview under the list shows the highlighted block's
+first lines, so two similarly named paths are told apart before `enter`. The blocks are restored from the session entry written
 with the reply, so the tab survives `/reload` and a resumed session; it is empty only when
 that entry is missing or does not match the reply — one from before the install, or a message
 with no timestamp — and then the parsed tab is what is left. That tab copies markdown read

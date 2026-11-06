@@ -151,3 +151,23 @@ test("switching tabs keeps the filter and resets the selection", () => {
   assert.equal(state.selected, 0);
   assert.match(currentItem(source, state)?.body ?? "", /def greet/);
 });
+
+test("the hand-off tab badges each block by what it carries", () => {
+  const command: HandoffBlock = {
+    toolCallId: "c",
+    kind: "command",
+    purpose: "list the files",
+    body: "ls\n",
+    lang: "bash",
+    caption: "`list the files` — command",
+  };
+  const items = handoffItems([
+    block({ toolCallId: "a" }),
+    block({ toolCallId: "b", form: "full", path: "notes.md" }),
+    command,
+  ]);
+  assert.deepEqual(
+    items.map((item) => item.badge),
+    ["diff", "full", "cmd"],
+  );
+});

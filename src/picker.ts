@@ -18,6 +18,8 @@ export interface PickerItem {
   label: string;
   /** The exact text `enter` puts on the clipboard. */
   body: string;
+  /** A short kind tag for the list, when the label does not already say it. */
+  badge?: string;
 }
 
 export interface PickerSource {
@@ -34,7 +36,11 @@ export interface PickerState {
 
 /** The hand-off tab: the validated blocks, labelled by their captions. */
 export function handoffItems(blocks: readonly HandoffBlock[]): PickerItem[] {
-  return blocks.map((block) => ({ label: block.caption, body: block.body }));
+  return blocks.map((block) => ({
+    label: block.caption,
+    body: block.body,
+    badge: block.kind === "command" ? "cmd" : (block.form ?? "diff"),
+  }));
 }
 
 /** The parsed tab: the reply's own markdown blocks, copied as raw markdown. */
