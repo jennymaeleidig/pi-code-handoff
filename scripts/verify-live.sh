@@ -264,8 +264,10 @@ clip_into() {
 }
 
 # ends_with_newline FILE: true when the last byte is a newline, which a patch needs.
+# Counted with wc, not compared as text: command substitution strips the very
+# newline being tested, so "$(tail -c1 "$f")" is empty for every file.
 ends_with_newline() {
-  [[ -s "$1" && -z "$(tail -c1 "$1")" ]]
+  [[ -s "$1" && "$(tail -c1 "$1" | wc -l | tr -d ' ')" -eq 1 ]]
 }
 
 run_wizard() {
@@ -318,6 +320,20 @@ for bin in pi git node; do
     warn "$bin is not on PATH; the stages that need it will not work"
   fi
 done
+# The payload stages read what the picker wrote through this shell's clipboard. When
+# that is not the same clipboard pi writes to, the checks cannot run, and pretending
+# otherwise is how an unread clipboard gets reported as a lost trailing newline.
+if printf 'pi-copy-paste probe' | clip_write 2>/dev/null &&
+  [[ "$(clip_read 2>/dev/null)" == 'pi-copy-paste probe' ]]; then
+  CLIPBOARD_OK=yes
+  note "✓ the clipboard round-trips through this shell"
+else
+  CLIPBOARD_OK=no
+  warn "the clipboard does not come back through this shell"
+  say "The picker's copy will still work; this shell just cannot see it. The payload"
+  say "stages will record themselves as unchecked. Run the wizard from the same"
+  say "terminal pi runs in, or paste each payload into an editor to check it by eye."
+fi
 # Always start from the seeded tree: a tree still carrying the last run's applied
 # changes would let this run's checks pass without anything being pasted.
 if [[ -d "$SCRATCH" ]]; then
@@ -376,8 +392,13 @@ pause "Press Enter once the block is on the clipboard"
 clip_into "$STATE/picked.txt"
 payload="$(cat "$STATE/picked.txt")"
 if [[ -z "$payload" ]]; then
-  warn "the clipboard is empty or unreadable here; check by pasting it somewhere"
-  PICKER_PAYLOAD_OK=$(ask_yes_no "Did a bare patch arrive, starting with --- a/ and no fence?")
+  # A copy that never reached this shell's clipboard is not the picker's fault, and
+  # a human cannot certify bytes the script cannot see.
+  PICKER_PAYLOAD_OK="unchecked: the clipboard read empty in this terminal"
+  warn "the clipboard read empty here, so the payload could not be checked"
+  say "Paste once into an editor to see what actually arrived. If the block is there,"
+  say "this terminal's clipboard is not visible to the shell, which is a setup problem,"
+  say "not a failure of the picker. Re-run from the terminal pi itself runs in."
 elif [[ "$payload" == '```'* || "$payload" == '~~~'* ]]; then
   warn "the clipboard payload starts with a fence, not a patch header:"
   show_prefix "$payload"
@@ -406,7 +427,10 @@ write_env PICKER_PAYLOAD_OK "$PICKER_PAYLOAD_OK"
 stage "Check the payload applies"
 say "Applying is the applier's business and lives outside this package, so this stage"
 say "only asks git whether the clipboard's patch fits the tree it was made against."
-if git -C "$SCRATCH" apply --check -p1 "$STATE/picked.txt" 2>"$STATE/apply.err"; then
+if [[ ! -s "$STATE/picked.txt" ]]; then
+  PATCH_APPLIES="unchecked: nothing reached the clipboard to check"
+  warn "skipped: the picker's payload never arrived, so there is nothing to hand to git"
+elif git -C "$SCRATCH" apply --check -p1 "$STATE/picked.txt" 2>"$STATE/apply.err"; then
   PATCH_APPLIES=yes
   note "✓ git apply --check -p1 accepted the picked payload as it stands"
 else
@@ -437,8 +461,10 @@ awk '
   section && opened { print }
 ' "$STATE/reply.txt" > "$STATE/stripped.diff"
 if [[ -z "$reply" ]]; then
-  WHOLE_REPLY_OK="no: the clipboard did not hold the reply"
-  warn "the whole-reply path did not copy the message"
+  WHOLE_REPLY_OK="unchecked: the clipboard read empty in this terminal"
+  warn "the clipboard read empty here, so the reply was never checked"
+  say "Paste once to see whether the whole reply arrived; if it did, the clipboard is not"
+  say "visible to this shell, and the copy itself is fine."
 elif [[ ! -s "$STATE/stripped.diff" ]]; then
   WHOLE_REPLY_OK="no: no fenced block followed the Hand-off heading"
   warn "the clipboard held no fenced block to strip"
@@ -491,6 +517,7 @@ mkdir -p "$REPO/docs/verification"
   printf -- '- pi: %s\n' "$PI_VERSION"
   printf -- '- node: %s\n' "$NODE_VERSION"
   printf -- '- scratch repository: `%s`\n' "$SCRATCH"
+  printf -- '- clipboard readable from the shell: %s\n' "$CLIPBOARD_OK"
 } > "$REPORT"
 note "✓ wrote $REPORT"
 SKIPPED+=("read $REPORT (gitignored, so it is not committed)")
@@ -499,6 +526,11 @@ printf '  %sReport: %s%s\n\n' "$GREEN" "$REPORT" "$RESET"
 if [[ "$HANDOFF_OK" == yes && "$PICKER_PAYLOAD_OK" == yes &&
   "$PATCH_APPLIES" == yes && "$WHOLE_REPLY_OK" == yes ]]; then
   printf '  %s✓ every criterion passed%s\n\n' "$GREEN" "$RESET"
+elif [[ "$PICKER_PAYLOAD_OK" == unchecked* || "$PATCH_APPLIES" == unchecked* ||
+  "$WHOLE_REPLY_OK" == unchecked* ]]; then
+  printf '  %s⚠ the payload could not be checked: this shell cannot see the clipboard%s\n\n' \
+    "$YELLOW" "$RESET"
+  exit 2
 else
   printf '  %s⚠ the run did not pass; see the report%s\n\n' "$YELLOW" "$RESET"
   exit 1
