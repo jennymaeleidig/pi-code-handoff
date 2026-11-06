@@ -152,7 +152,6 @@ function previewLines(item: PickerItem, innerWidth: number, theme: PickerTheme):
 const HINTS: { key: string; text: string }[] = [
   { key: "↑↓", text: "move" },
   { key: "tab", text: "switch" },
-  { key: "1/2", text: "tabs" },
   { key: "enter", text: "copy" },
   { key: "esc", text: "cancel" },
 ];
@@ -161,8 +160,7 @@ const HINTS: { key: string; text: string }[] = [
 function helpLine(theme: PickerTheme, innerWidth: number): string {
   const sets = [
     HINTS,
-    HINTS.filter((hint) => hint.key !== "1/2"),
-    HINTS.filter((hint) => hint.key !== "1/2" && hint.key !== "tab"),
+    HINTS.filter((hint) => hint.key !== "tab"),
     HINTS.filter((hint) => hint.key === "enter" || hint.key === "esc"),
   ];
   for (const set of sets) {
@@ -199,10 +197,10 @@ function renderPicker(
       const item = items[offset]!;
       lines.push(row(` ${itemRow(item, offset === state.selected, theme)}`, innerWidth, theme));
     }
-    if (items.length > MAX_ROWS) {
-      lines.push(
-        row(` ${theme.fg("dim", `${state.selected + 1}/${items.length}`)}`, innerWidth, theme),
-      );
+    if (items.length > 1) {
+      const counter = `${state.selected + 1}/${items.length}`;
+      const gap = " ".repeat(Math.max(0, innerWidth - 2 - visibleWidth(counter)));
+      lines.push(row(` ${gap}${theme.fg("dim", counter)}`, innerWidth, theme));
     }
   }
 
