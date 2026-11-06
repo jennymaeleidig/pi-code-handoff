@@ -86,7 +86,7 @@ test("both tabs' counts are in the frame, and the empty one is switched away", (
   const source = pickerSource([], "```ts\nx\n```\n");
   const lines = frame(source);
   assert.ok(lines.some((line) => line.includes("Hand-off 0")));
-  assert.ok(lines.some((line) => line.includes("Parsed 1")));
+  assert.ok(lines.some((line) => line.includes("Agent reply 1")));
 });
 
 test("a filter that matches nothing says so instead of showing an empty list", () => {

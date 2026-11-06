@@ -39,7 +39,7 @@ hand-off tab copies the body from memory and never reads the fences.
 - **Picker path** (`/copy-paste`, `Ctrl+Shift+C`): the hand-off tab copies the block the
   extension validated rather than re-reading rendered markdown, so a `diff` block's clipboard
   payload is a bare patch and needs no fence handling at all. That promise covers the hand-off
-  tab alone: the picker's parsed tab reads markdown back out of the message text and promises
+  tab alone: the picker's Agent reply tab reads markdown back out of the message text and promises
   no more than the message contains.
 - **Whole-reply path** (`/copy`, `Ctrl+X`): the fences come along, so strip one leading fence
   together with the tag that follows it, and the trailing run, which is at least as long as

@@ -64,7 +64,7 @@ _Avoid_: Consumer, patcher, DiffApply
 
 **Picker**:
 `/copy-paste`'s overlay, the copy path that reaches a block from inside pi: a hand-off tab
-listing this reply's validated blocks, and a parsed tab listing the reply's own markdown
+listing this reply's validated blocks, and an Agent reply tab listing the reply's own markdown
 blocks.
 _Avoid_: Clip, copy menu
 
@@ -75,13 +75,14 @@ _Avoid_: Block list, picker list
 
 **Payload**:
 The exact text a picker item copies: a hand-off block's body alone, without its caption or
-fences; on the parsed tab, the block's source markdown.
+fences; on the Agent reply tab, the block's source markdown.
 _Avoid_: Content, clipboard text
 
-**Parsed tab**:
-The picker's second tab: the reply's own fenced code, tables, lists and blockquotes, read
-back out of the message text. The fallback when the hand-off tab has nothing.
-_Avoid_: Raw view, fallback tab
+**Agent reply tab**:
+The picker's second tab, keyed `parsed` in the code: the reply's own fenced code, tables, lists
+and blockquotes, read back out of the message text. The fallback when the hand-off tab has
+nothing.
+_Avoid_: Parsed tab, raw view, fallback tab
 
 **Fence length**:
 How many backticks a block's fence carries — a property of the block's content, not a house

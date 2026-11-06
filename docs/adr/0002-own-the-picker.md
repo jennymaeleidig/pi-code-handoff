@@ -21,7 +21,7 @@ and three block kinds this package never emits.
 
 Ship the picker here. `/copy-paste` and `ctrl+shift+c` always open it, on a **hand-off tab**
 listing the blocks `copy_paste` validated during this reply, copied from memory as their exact
-bodies, with a **parsed tab** listing the reply's own markdown blocks — fenced code, tables,
+bodies, with an **Agent reply tab** listing the reply's own markdown blocks — fenced code, tables,
 lists and blockquotes — for everything else.
 
 Rejected:
@@ -42,7 +42,7 @@ Rejected:
   now serves the whole-reply path alone (`/copy`, `ctrl+x`); the contract states the rule and
   its reason.
 - The hand-off tab reads blocks the extension holds in memory, so the list is written to the
-  session once per assistant message. The parsed tab covers the case where that list is absent —
+  session once per assistant message. The Agent reply tab covers the case where that list is absent —
   a reply from before this extension was installed, or one whose entry does not match the
   message's timestamp — which makes it load-bearing rather than decorative.
 - This repository now owns a fence scanner, so a close longer than its opener, a close carrying

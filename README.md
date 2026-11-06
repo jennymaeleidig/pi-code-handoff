@@ -10,6 +10,8 @@ you:    Move parseKey into src/keys.ts and hand it off.
 pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --check passed.
         Validated src/keys.ts: new file, 18 lines.
 
+        ---
+
         ## Hand-off
 
         `src/index.ts` — 2 hunks
@@ -72,18 +74,18 @@ purpose of the command it carries. That caption is what the picker lists.
 ## Take the block
 
 **The picker.** Press `Ctrl+Shift+C` or run `/copy-paste`. The overlay opens on the **hand-off
-tab** when this reply has validated blocks, and on the parsed tab when it does not.
+tab** when this reply has validated blocks, and on the Agent reply tab when it does not.
 
 - `↑` `↓` move, `enter` copies, `esc` cancels.
 - Type to filter; `backspace` erases.
-- `tab` toggles to the **parsed tab**, `1` and `2` jump straight to either.
+- `tab` toggles to the **Agent reply tab**, `1` and `2` jump straight to either.
 
 The hand-off tab copies the block's body and nothing else: a diff arrives on the clipboard as a
 bare patch, with no fences to strip. A preview under the list shows the highlighted block's
 first lines, so two similarly named paths are told apart before `enter`. The blocks are restored from the session entry written
 with the reply, so the tab survives `/reload` and a resumed session; it is empty only when
 that entry is missing or does not match the reply — one from before the install, or a message
-with no timestamp — and then the parsed tab is what is left. That tab copies markdown read
+with no timestamp — and then the Agent reply tab is what is left. That tab copies markdown read
 back out of the message, fences included.
 
 **The applier.** What you paste into is yours:
@@ -120,8 +122,9 @@ Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, 
 ### Live verification
 
 `scripts/verify-live.sh` walks a human through the part a test cannot reach: install the
-extension in a real session, hand off a change, pick the block with the picker, apply it with
-your own applier, and record what happened. It works in a scratch repository, so nothing
-under version control changes except the report it writes to `docs/verification/`, and
-`.pi/settings.json` is untouched. Re-run it whenever the picker, the applier or the splice
-changes.
+extension in a real session, hand off a change, pick the block with the picker, and see that
+what lands on the clipboard is a patch git accepts and that the whole-reply path strips to the
+same bytes. It works in a scratch repository, so nothing under version control changes except
+the report it writes to `docs/verification/`, and `.pi/settings.json` is untouched. Applying a
+block is the applier's business — that code lives in your dotfiles, not here — so it is out of
+scope. Re-run it whenever the picker, the hand-off section or the splice changes.

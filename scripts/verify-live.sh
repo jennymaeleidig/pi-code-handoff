@@ -252,7 +252,7 @@ clear_state() {
   [[ -f "$ENV_FILE" ]] || return 0
   local tmp
   tmp=$(mktemp)
-  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|APPLIED_OK|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE|CONTRADICTIONS)=' \
+  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|PATCH_APPLIES|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE|CONTRADICTIONS)=' \
     "$ENV_FILE" > "$tmp" || true
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
@@ -402,24 +402,24 @@ if [[ "$PICKER_PAYLOAD_OK" == yes ]]; then
 fi
 write_env PICKER_PAYLOAD_OK "$PICKER_PAYLOAD_OK"
 
-stage "Apply it in your editor"
-say "Paste the patch into your applier and apply it against the scratch repo:"
-step "your applier (vim's :DiffApply, or whatever consumes a patch from the clipboard)"
-step "no applier yet: cd \"$SCRATCH\" && git apply -p1 proves the payload, not this criterion"
-pause "Press Enter once it has been applied"
-if grep -q 'export function greeting' "$SCRATCH/src/greeting.ts"; then
-  APPLIED_OK=yes
-  note "✓ src/greeting.ts now exports greeting, applied without hand-editing it"
+stage "Check the payload applies"
+say "Applying is the applier's business and lives outside this package, so this stage"
+say "only asks git whether the clipboard's patch fits the tree it was made against."
+if git -C "$SCRATCH" apply --check -p1 "$STATE/picked.txt" 2>"$STATE/apply.err"; then
+  PATCH_APPLIES=yes
+  note "✓ git apply --check -p1 accepted the picked payload as it stands"
 else
-  APPLIED_OK="no: src/greeting.ts still exports greet"
-  warn "the file under $SCRATCH does not show the applied change"
+  PATCH_APPLIES="no: git apply --check refused the payload"
+  warn "git refused the payload:"
+  head -n 4 "$STATE/apply.err" | sed 's/^/        /'
 fi
-write_env APPLIED_OK "$APPLIED_OK"
+write_env PATCH_APPLIES "$PATCH_APPLIES"
 
 stage "The whole-reply path"
 say "Back in the pi session, on the same reply:"
 step "press Ctrl+X (or run /copy) with nothing selected in fullscreen mode"
-say "That copies the whole reply, fences and all."
+say "That copies the whole reply, fences and all. This stage checks that stripping the"
+say "outer fence gives back exactly the patch the picker copied."
 printf '' | clip_write 2>/dev/null ||
   warn "could not clear the clipboard; the reply check may read an older payload"
 pause "Press Enter once the reply has been copied"
@@ -428,26 +428,31 @@ reply="$(cat "$STATE/reply.txt")"
 if [[ -n "$reply" ]]; then
   show_prefix "$reply"
 fi
-case "$reply" in
-  *'## Hand-off'*) note "✓ the hand-off section came along" ;;
-  *)
-    REPLY_HAS_SECTION="no: the clipboard did not hold the reply"
-    warn "no Hand-off section in the clipboard; was a message selected?" ;;
-esac
-REPLY_HAS_SECTION=${REPLY_HAS_SECTION:-yes}
-say "Now let the applier strip the outer fence and apply the second block:"
-step "for src/index.ts the block is the file entire, so saving it over the path is applying it"
-step "by hand: drop the leading fence and its tag line, the closing run, and the empty line before it"
-pause "Press Enter once it has been applied"
-if [[ "$REPLY_HAS_SECTION" != yes ]]; then
+# The first fenced block after the heading, with its own fence lines removed.
+awk '
+  /^## Hand-off$/ { section = 1; next }
+  section && !opened && /^`{3,}/ { opened = 1; next }
+  section && opened && /^`{3,}/ { exit }
+  section && opened { print }
+' "$STATE/reply.txt" > "$STATE/stripped.diff"
+if [[ -z "$reply" ]]; then
   WHOLE_REPLY_OK="no: the clipboard did not hold the reply"
   warn "the whole-reply path did not copy the message"
-elif [[ -f "$SCRATCH/src/index.ts" ]] && grep -q 'greeting' "$SCRATCH/src/index.ts"; then
-  WHOLE_REPLY_OK=yes
-  note "✓ src/index.ts exists and re-exports greeting"
+elif [[ ! -s "$STATE/stripped.diff" ]]; then
+  WHOLE_REPLY_OK="no: no fenced block followed the Hand-off heading"
+  warn "the clipboard held no fenced block to strip"
 else
-  WHOLE_REPLY_OK="no: $SCRATCH/src/index.ts is missing or does not mention greeting"
-  warn "src/index.ts does not look applied"
+  # Command substitution drops the empty line the block leaves before its closing
+  # fence and keeps one newline, which is the body byte for byte.
+  printf '%s\n' "$(cat "$STATE/stripped.diff")" > "$STATE/stripped.normalized"
+  if cmp -s "$STATE/stripped.normalized" "$STATE/picked.txt"; then
+    WHOLE_REPLY_OK=yes
+    note "✓ the stripped fence is the picker's payload, byte for byte"
+  else
+    WHOLE_REPLY_OK="no: the stripped fence differs from what the picker copied"
+    warn "the stripped block is not the same text as the picked payload"
+    diff "$STATE/picked.txt" "$STATE/stripped.normalized" | head -n 6 | sed 's/^/        /'
+  fi
 fi
 write_env WHOLE_REPLY_OK "$WHOLE_REPLY_OK"
 
@@ -472,12 +477,12 @@ mkdir -p "$REPO/docs/verification"
 {
   printf '# Live verification: %s\n\n' "$(date +%Y-%m-%d)"
   printf 'A run of `scripts/verify-live.sh` against a scratch repository: the extension\n'
-  printf 'installed in a real session, a block picked from the reply and applied outside pi.\n\n'
+  printf 'installed in a real session, a block picked from the reply, and the clipboard payload\n'
+  printf 'checked against git. Applying it is the applier\x27s business, and out of scope.\n\n'
   printf '| Criterion | Result |\n| --- | --- |\n'
   printf '| One `copy_paste` call hands off a change | %s |\n' "$HANDOFF_OK"
-  printf '| The picker copies a bare patch | %s |\n' "$PICKER_PAYLOAD_OK"
-  printf '| The applier applies it without hand fence handling | %s |\n' "$APPLIED_OK"
-  printf '| The whole-reply path still applies after fence stripping | %s |\n' "$WHOLE_REPLY_OK"
+  printf '| The picker copies a bare patch that git accepts | %s |\n' "$PICKER_PAYLOAD_OK"
+  printf '| The whole-reply path strips to the same patch | %s |\n' "$WHOLE_REPLY_OK"
   printf '| Reflow acceptable | %s |\n\n' "$REFLOW_ACCEPTABLE"
   printf '## Reflow\n\n%s\n\n' "$REFLOW"
   printf '## What the contract must change\n\n%s\n\n' "$CONTRADICTIONS"
@@ -491,7 +496,7 @@ SKIPPED+=("read $REPORT, then commit it: git add docs/verification")
 finish
 printf '  %sReport: %s%s\n\n' "$GREEN" "$REPORT" "$RESET"
 if [[ "$HANDOFF_OK" == yes && "$PICKER_PAYLOAD_OK" == yes &&
-  "$APPLIED_OK" == yes && "$WHOLE_REPLY_OK" == yes ]]; then
+  "$PATCH_APPLIES" == yes && "$WHOLE_REPLY_OK" == yes ]]; then
   printf '  %s✓ every criterion passed%s\n\n' "$GREEN" "$RESET"
 else
   printf '  %s⚠ the run did not pass; see the report%s\n\n' "$YELLOW" "$RESET"

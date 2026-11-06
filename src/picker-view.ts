@@ -118,7 +118,7 @@ function tabLabels(state: PickerState, source: PickerSource, theme: PickerTheme)
   };
   return `${label("handoff", "Hand-off", source.handoff.length)}  ${label(
     "parsed",
-    "Parsed",
+    "Agent reply",
     source.parsed.length,
   )}`;
 }
