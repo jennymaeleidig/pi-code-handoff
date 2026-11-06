@@ -492,7 +492,7 @@ mkdir -p "$REPO/docs/verification"
   printf -- '- scratch repository: `%s`\n' "$SCRATCH"
 } > "$REPORT"
 note "✓ wrote $REPORT"
-SKIPPED+=("read $REPORT, then commit it: git add docs/verification")
+SKIPPED+=("read $REPORT (gitignored, so it is not committed)")
 finish
 printf '  %sReport: %s%s\n\n' "$GREEN" "$REPORT" "$RESET"
 if [[ "$HANDOFF_OK" == yes && "$PICKER_PAYLOAD_OK" == yes &&

@@ -124,7 +124,7 @@ Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, 
 `scripts/verify-live.sh` walks a human through the part a test cannot reach: install the
 extension in a real session, hand off a change, pick the block with the picker, and see that
 what lands on the clipboard is a patch git accepts and that the whole-reply path strips to the
-same bytes. It works in a scratch repository, so nothing under version control changes except
-the report it writes to `docs/verification/`, and `.pi/settings.json` is untouched. Applying a
-block is the applier's business — that code lives in your dotfiles, not here — so it is out of
-scope. Re-run it whenever the picker, the hand-off section or the splice changes.
+same bytes. It works in a scratch repository, so nothing under version control changes: the
+report it writes to `docs/verification/` is gitignored, and `.pi/settings.json` is untouched.
+Applying a block is the applier's business — that code lives in your dotfiles, not here — so it
+is out of scope. Re-run it whenever the picker, the hand-off section or the splice changes.
