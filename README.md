@@ -102,7 +102,12 @@ the reply, so the tab survives `/reload` and a resumed session; it is empty only
 is missing or does not match the reply — one from before the install, or a message with no
 timestamp — and then the Agent reply tab is what is left. That tab lists what the message itself
 is made of — each fenced block, table, list and quote, tagged with its kind and where it
-starts — and ends with the whole reply as one item, so there is always something to take.
+starts — and ends with the whole reply as one item, so there is always something to take. A
+fence tagged as anything but `md` — `diff`, `ts`, `bash`, or nothing at all — copies as the
+code inside it: the fences are decoration around the payload, so they come off and the trailing
+newline a fenced body cannot carry is put back, which is what a patch or a saved snippet wants.
+An `md` fence holds a document, often one that fences blocks of its own, so it keeps its outer
+fence and the blocks nested inside it arrive decorated exactly as the message has them.
 
 **The applier.** What you paste into is yours:
 

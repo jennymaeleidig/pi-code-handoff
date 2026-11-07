@@ -53,12 +53,17 @@ test("a body containing its own fenced block is copied byte for byte", () => {
   assert.equal(payload(item), body);
 });
 
-test("the Agent reply tab copies raw markdown, fences included", () => {
+test("the Agent reply tab copies a code block as code, fences dropped", () => {
   const items = parsedItems("Text.\n\n```diff\n+x\n```\n");
   assert.equal(items.length, 2);
-  assert.equal(payload(items[0]!), "```diff\n+x\n```");
+  assert.equal(payload(items[0]!), "+x\n");
   assert.match(items[1]!.label, /\[md\] — full response, 5 lines/);
   assert.equal(payload(items[1]!), "Text.\n\n```diff\n+x\n```\n");
+});
+
+test("the Agent reply tab keeps an md block's fences, nested ones included", () => {
+  const text = ["````md", "Notes.", "", "```sh", "echo hi", "```", "````", ""].join("\n");
+  assert.equal(payload(parsedItems(text)[0]!), "````md\nNotes.\n\n```sh\necho hi\n```\n````");
 });
 
 test("the picker opens on the hand-off tab when it has blocks", () => {

@@ -46,7 +46,7 @@ export function handoffItems(blocks: readonly HandoffBlock[]): PickerItem[] {
   }));
 }
 
-/** The Agent reply tab: the reply's own markdown blocks, copied as raw markdown. */
+/** The Agent reply tab: the reply's own markdown blocks, a code fence's fences off. */
 export function parsedItems(text: string): PickerItem[] {
   const blocks = parseMarkdownBlocks(text).map((block) => ({
     label: block.label,

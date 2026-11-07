@@ -8,6 +8,15 @@ follows [Semantic Versioning][].
 
 ## [Unreleased]
 
+### Changed
+
+- **The picker's Agent reply tab copies a code block as code.** A fence tagged as anything but
+  `md` — `diff`, `ts`, `bash`, or nothing at all — now contributes its body alone, with the
+  trailing newline a fenced body cannot carry put back, so a patch or a snippet arrives
+  pasteable instead of wrapped in backticks. An `md` fence is a document whose own fences are
+  part of it and still copies whole, its nested blocks decorated as the message has them. The
+  hand-off tab is untouched: it copies the validated body and has always done so.
+
 ## [1.0.0] - 2026-11-06
 
 The first release: a change can be handed off, picked out of the reply and pasted into an

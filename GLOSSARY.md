@@ -76,14 +76,17 @@ _Avoid_: Block list, picker list
 
 **Payload**:
 The exact text a picker item copies: a hand-off block's body alone, without its caption or
-fences; on the Agent reply tab, the block's source markdown.
+fences; on the Agent reply tab, a fenced block's body — fences off for code, fences on for a
+document — and the source of a table, list or quote.
 _Avoid_: Content, clipboard text
 
 **Agent reply tab**:
 The picker's second tab, keyed `parsed` in the code: the reply's own fenced code, tables, lists
 and blockquotes, read back out of the message text, followed by the whole reply as one item.
-That item is a copy of the message rather than one of its blocks, so it is not counted in the
-tab's total. The fallback when the hand-off tab has nothing.
+Its fenced blocks split by tag: a code fence copies as code, its own fences dropped, while an
+`md` fence is a document and copies whole, its nested blocks still decorated. The whole-reply
+item is a copy of the message rather than one of its blocks, so it is not counted in the tab's
+total. The fallback when the hand-off tab has nothing.
 _Avoid_: Parsed tab, raw view, fallback tab
 
 **Fence length**:

@@ -32,7 +32,8 @@ computed from the content rather than written by hand. A non-empty block leaves 
 line before the closing fence, because a fenced body cannot otherwise carry a final newline:
 a reader that strips the fences gets the body's trailing newline back, and a patch that lost
 one is `corrupt patch` to git. That blank line serves the whole-reply path; the picker's
-hand-off tab copies the body from memory and never reads the fences.
+hand-off tab copies the body from memory and never reads the fences, and the Agent reply tab
+reads the blank line back as the body's final newline when it strips a code fence.
 
 The section itself opens with a horizontal rule above its heading, so it reads as separate
 from the reply's prose. The rule is part of the reply and never part of a block: stripping a
@@ -45,7 +46,9 @@ because the picker's tabs cannot be seen from the transcript.
   extension validated rather than re-reading rendered markdown, so a `diff` block's clipboard
   payload is a bare patch and needs no fence handling at all. That promise covers the hand-off
   tab alone: the picker's Agent reply tab reads markdown back out of the message text and promises
-  no more than the message contains.
+  no more than the message contains. It does read fences by tag, though — a code fence copies as
+  its code, the fences decoration around it, while an `md` fence is a document whose own fences
+  are part of it and copies whole.
 - **Whole-reply path** (`/copy`, `Ctrl+X`): the fences come along, so strip one leading fence
   together with the tag that follows it, and the trailing run, which is at least as long as
   the leading one.

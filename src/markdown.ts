@@ -1,21 +1,24 @@
 /**
- * The Agent reply tab's view of a reply: its own markdown blocks, read back out of
- * the message text as raw markdown.
+ * The Agent reply tab's view of a reply: its own markdown blocks, read back out
+ * of the message text.
  *
  * A block is copied whole — a table keeps its rows, a list its items, a
- * blockquote its `>` marks, a fenced block its fences — because this tab makes
- * no promise about content beyond "this is what the message says". Fences are
- * found by `fences.ts`, so nested and escaped fences stay content rather than
- * structure.
+ * blockquote its `>` marks — because this tab makes no promise about content
+ * beyond "this is what the message says". A fenced block is the exception, and
+ * it splits in two: a code fence's own fences are decoration around the
+ * payload, so they come off and the code arrives as code; an `md` fence holds a
+ * document, often one that fences blocks of its own, so it keeps its outer
+ * fence and the blocks nested inside it stay decorated. Fences are found by
+ * `fences.ts`, so nested and escaped fences stay content rather than structure.
  */
 
-import { scanFenceSpans } from "./fences.ts";
+import { scanFenceSpans, type FenceSpan } from "./fences.ts";
 import { plural } from "./handoff.ts";
 
 export interface ParsedBlock {
   /** One line naming the kind and where it starts, for the picker's list. */
   label: string;
-  /** The source lines of the block, joined with newlines. */
+  /** What `enter` copies: the block's source, without a code fence's fences. */
   body: string;
 }
 
@@ -27,6 +30,40 @@ const TABLE_DELIMITER = /^ {0,3}\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|
 function fenceCaption(lang: string, line: number): string {
   const tag = lang === "" ? "code" : lang;
   return `[${tag}] — line ${line}`;
+}
+
+/**
+ * Info strings whose body is a document to read rather than code to run. The
+ * fence is part of that payload, and so is any fence inside it.
+ */
+const DOCUMENT_TAGS = new Set(["md", "markdown"]);
+
+/** The tag word of an info string, lower-cased: `ts title=x` is `ts`. */
+function fenceTag(lang: string): string {
+  return (lang.split(/\s+/, 1)[0] ?? "").toLowerCase();
+}
+
+function keepsFences(lang: string): boolean {
+  return DOCUMENT_TAGS.has(fenceTag(lang));
+}
+
+/**
+ * A code fence's body, with the final newline a fenced body cannot carry put
+ * back. A hand-off block's fence leaves an empty line before the closer for
+ * exactly this reason, so a block this extension spliced arrives here already
+ * terminated and unchanged; a patch that lost its last newline is `corrupt
+ * patch` to git.
+ */
+function codeBody(body: string): string {
+  return body === "" || body.endsWith("\n") ? body : `${body}\n`;
+}
+
+function fencedBody(fence: FenceSpan, lines: string[]): string {
+  // The scanner hands back the body with the opener's indentation removed; the
+  // document case needs the source, fences and all.
+  return keepsFences(fence.lang)
+    ? lines.slice(fence.start, fence.end).join("\n")
+    : codeBody(fence.body);
 }
 
 function tableStart(lines: string[], index: number): boolean {
@@ -77,11 +114,9 @@ export function parseMarkdownBlocks(text: string): ParsedBlock[] {
   while (index < lines.length) {
     const fence = fences.get(index);
     if (fence) {
-      // The Agent reply tab copies the source, fences included, so it slices the
-      // lines rather than using the scanner's deindented `body`.
       blocks.push({
         label: fenceCaption(fence.lang, index + 1),
-        body: lines.slice(index, fence.end).join("\n"),
+        body: fencedBody(fence, lines),
       });
       index = fence.end;
       continue;

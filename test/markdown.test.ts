@@ -2,9 +2,34 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseMarkdownBlocks } from "../src/markdown.ts";
 
-test("fenced blocks come back whole, fences included", () => {
+test("a code fence copies as its code, fences dropped", () => {
   const blocks = parseMarkdownBlocks("Intro.\n\n```diff\n--- a/x\n+++ b/x\n```\n\nOutro.\n");
-  assert.deepEqual(blocks, [{ label: "[diff] — line 3", body: "```diff\n--- a/x\n+++ b/x\n```" }]);
+  assert.deepEqual(blocks, [{ label: "[diff] — line 3", body: "--- a/x\n+++ b/x\n" }]);
+});
+
+test("an untagged fence is code too, so its fences come off", () => {
+  assert.deepEqual(parseMarkdownBlocks("```\n$ ls\n```\n"), [
+    { label: "[code] — line 1", body: "$ ls\n" },
+  ]);
+});
+
+test("a code block ends in a newline, because the code line does", () => {
+  assert.equal(parseMarkdownBlocks("```diff\n+x\n```")[0]!.body, "+x\n");
+});
+
+test("a spliced hand-off block reads back as the body the hand-off tab copies", () => {
+  // renderBlock leaves one empty line before the closer so the body keeps its
+  // trailing newline; with the fences off, that blank line is the body's own.
+  const body = "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n";
+  const section = "\`\`\`diff\n" + body + "\n\`\`\`";
+  assert.equal(parseMarkdownBlocks(section)[0]!.body, body);
+});
+
+test("an md fence keeps its fences, so nested blocks stay decorated", () => {
+  const text = ["````md", "Intro.", "", "```ts", "const a = 1;", "```", "````", ""].join("\n");
+  assert.deepEqual(parseMarkdownBlocks(text), [
+    { label: "[md] — line 1", body: "````md\nIntro.\n\n```ts\nconst a = 1;\n```\n````" },
+  ]);
 });
 
 test("nested fences stay one item, because the outer fence is longer", () => {
@@ -24,6 +49,7 @@ test("nested fences stay one item, because the outer fence is longer", () => {
   const blocks = parseMarkdownBlocks(text);
   assert.equal(blocks.length, 1);
   assert.equal(blocks[0]!.label, "[markdown] — line 3");
+  assert.ok(blocks[0]!.body.startsWith("`````markdown"));
   assert.ok(blocks[0]!.body.includes("```py"));
   assert.ok(blocks[0]!.body.endsWith("`````"));
 });
