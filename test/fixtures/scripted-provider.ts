@@ -1,7 +1,7 @@
 /**
  * A scripted provider for the real-binary row test.
  *
- * It answers without a network: the first request asks copy_paste to change
+ * It answers without a network: the first request asks code_handoff to change
  * one file, the second asks for a second file, and later requests finish with
  * prose. That is enough to prove that the blocks land on the tool results and
  * never in the assistant entry persisted after `message_end`.
@@ -96,13 +96,13 @@ export default function scriptedProvider(pi: ExtensionAPI): void {
     ],
     streamSimple(model: Model<string>, context: TranscriptContext) {
       const results = context.messages.filter(
-        (message) => message.role === "toolResult" && message.toolName === "copy_paste",
+        (message) => message.role === "toolResult" && message.toolName === "code_handoff",
       ).length;
 
       if (results === 0) {
         return respond(model, "", {
           id: "call-a",
-          name: "copy_paste",
+          name: "code_handoff",
           arguments: {
             kind: "code",
             path: "a.txt",
@@ -113,7 +113,7 @@ export default function scriptedProvider(pi: ExtensionAPI): void {
       if (results === 1) {
         return respond(model, "", {
           id: "call-b",
-          name: "copy_paste",
+          name: "code_handoff",
           arguments: {
             kind: "code",
             path: "b.txt",

@@ -54,8 +54,8 @@ test(
     const extension = fileURLToPath(new URL("../src/index.ts", import.meta.url));
     const provider = fileURLToPath(new URL("./fixtures/scripted-provider.ts", import.meta.url));
     const repo = await makeRepo({ "a.txt": "one\n", "b.txt": "two\n" });
-    const config = await mkdtemp(join(tmpdir(), "pi-copy-paste-config-"));
-    const sessions = await mkdtemp(join(tmpdir(), "pi-copy-paste-sessions-"));
+    const config = await mkdtemp(join(tmpdir(), "pi-code-handoff-config-"));
+    const sessions = await mkdtemp(join(tmpdir(), "pi-code-handoff-sessions-"));
 
     try {
       const { stdout, stderr, code } = await run(

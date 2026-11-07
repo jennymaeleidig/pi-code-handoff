@@ -10,12 +10,12 @@ test("the counts include a content line that starts like a file header", () => {
   assert.deepEqual(countDiff(diff), { hunks: 1, insertions: 1, deletions: 0 });
 });
 
-test("registers copy_paste and a message_end handler", () => {
+test("registers code_handoff and a message_end handler", () => {
   const harness = loadExtension("/tmp");
-  assert.equal(harness.tool.name, "copy_paste");
+  assert.equal(harness.tool.name, "code_handoff");
   assert.match(harness.tool.description, /draw a copyable hand-off block in this tool's row/i);
   assert.match(harness.tool.description, /do not repeat it/i);
-  assert.ok(harness.tool.promptGuidelines?.some((rule) => rule.includes("copy_paste")));
+  assert.ok(harness.tool.promptGuidelines?.some((rule) => rule.includes("code_handoff")));
 });
 
 test("code+diff emits a counted, validated diff and the row carries it", async () => {
@@ -309,7 +309,7 @@ test("messages that are not assistant content do not throw", async () => {
       await harness.emit({
         role: "toolResult",
         toolCallId: "x",
-        toolName: "copy_paste",
+        toolName: "code_handoff",
         content: [],
       }),
       undefined,

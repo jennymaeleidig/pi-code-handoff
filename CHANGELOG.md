@@ -8,6 +8,35 @@ follows [Semantic Versioning][].
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-11-07
+
+The package, the tool and the command are now named for what they hand off rather than for how
+the result is copied. Nothing about a block moves: same schema, same validation, same row, same
+picker, same payloads. Only the strings that name the surface changed.
+
+### Changed
+
+- **The tool is `code_handoff`, not `copy_paste`.** It names the artifact the model produces
+  instead of the keystroke that later copies it, and it no longer claims a clipboard it never
+  touches: the row is the reading path and the picker is the copy path, as they have been since
+  2.0.0. A call to the old name is an unknown tool. See
+  `docs/adr/0004-name-the-surface-code-handoff.md`.
+- **The package is `pi-code-handoff`**, and with it the install source:
+  `pi install git:github.com/jennymaeleidig/pi-code-handoff`. GitHub redirects the old URL, so an
+  existing clone keeps fetching, but `pi remove` followed by `pi install` is what leaves one
+  entry in `settings.json` rather than two.
+- **The command is `/code-handoff`**, and the tool's label is `Code Handoff`. `Ctrl+Shift+C` is
+  unchanged, and so is every word the overlay itself says: the tab still copies, `enter` still
+  says `copy`, and the title still reads `Copy`. Those describe the clipboard, not the tool.
+- **No compatibility for the old tool name.** A turn recorded before this release keeps its tool
+  results, but the picker's hand-off tab scans for `code_handoff` calls, so a resumed pre-3.0.0
+  session finds none and opens on its Agent reply tab instead. The blocks are still in the
+  transcript; they are no longer one of the tab's sources.
+- **The name lives in one place.** `TOOL_NAME` and `COMMAND_NAME` are exported from
+  `src/handoff.ts`; the registration, the model-facing guideline, the row title, the refusal
+  text and the session scan all read them, so the name the model is told and the name the picker
+  scans for cannot drift apart.
+
 ## [2.0.0] - 2026-11-07
 
 A hand-off block is its own row now, so the reply is prose and only prose. This is a major
@@ -75,6 +104,7 @@ applier, with the text guaranteed to apply before it ever reaches the clipboard.
   design decisions behind the picker — the splice, and owning the picker rather than delegating
   to an external clipper.
 
-[unreleased]: https://github.com/jennymaeleidig/pi-copy-paste/compare/v2.0.0...HEAD
-[2.0.0]: https://github.com/jennymaeleidig/pi-copy-paste/releases/tag/v2.0.0
-[1.0.0]: https://github.com/jennymaeleidig/pi-copy-paste/releases/tag/v1.0.0
+[unreleased]: https://github.com/jennymaeleidig/pi-code-handoff/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/jennymaeleidig/pi-code-handoff/releases/tag/v3.0.0
+[2.0.0]: https://github.com/jennymaeleidig/pi-code-handoff/releases/tag/v2.0.0
+[1.0.0]: https://github.com/jennymaeleidig/pi-code-handoff/releases/tag/v1.0.0

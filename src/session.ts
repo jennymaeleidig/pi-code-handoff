@@ -1,7 +1,7 @@
 /**
  * Reading the picker's hand-off tab back out of a session.
  *
- * A block *is* the `details` of the `copy_paste` tool result that produced it,
+ * A block *is* the `details` of the `code_handoff` tool result that produced it,
  * so the picker needs no side channel and no correlation key: the blocks of the
  * last turn are the blocks of the calls that turn made, in call order. A
  * `/reload` or a resume reads the same bytes the turn wrote.
@@ -12,6 +12,7 @@
  */
 
 import type { HandoffBlock } from "./handoff.ts";
+import { TOOL_NAME } from "./handoff.ts";
 
 /** A structural slice of a session entry, so callers need not widen their types. */
 export interface SessionEntryLike {
@@ -27,7 +28,7 @@ export interface SessionEntryLike {
 export interface Turn {
   /** Its text blocks joined the way pi renders them. */
   text: string;
-  /** The ids of its `copy_paste` calls, in message order. */
+  /** The ids of its `code_handoff` calls, in message order. */
   calls: string[];
 }
 
@@ -45,14 +46,14 @@ function textOf(content: unknown): string {
     .join("\n");
 }
 
-/** The ids of a message's `copy_paste` calls, in the order it made them. */
+/** The ids of a message's `code_handoff` calls, in the order it made them. */
 function handoffCalls(content: unknown): string[] {
   if (!Array.isArray(content)) return [];
   const ids: string[] = [];
   for (const block of content) {
     if (typeof block !== "object" || block === null) continue;
     const call = block as { type?: unknown; id?: unknown; name?: unknown };
-    if (call.type !== "toolCall" || call.name !== "copy_paste") continue;
+    if (call.type !== "toolCall" || call.name !== TOOL_NAME) continue;
     if (typeof call.id === "string") ids.push(call.id);
   }
   return ids;
@@ -71,7 +72,7 @@ function lastAssistantIndex(entries: readonly SessionEntryLike[]): number {
 }
 
 /**
- * The last turn's hand-off: the prose it wrote and the `copy_paste` calls it
+ * The last turn's hand-off: the prose it wrote and the `code_handoff` calls it
  * made. A turn is what a user message opens, so a turn that handed off and then
  * spoke still has both halves — a tool-using turn has several assistant
  * messages, and the blocks belong to the turn rather than to the last of them.

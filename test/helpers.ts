@@ -22,7 +22,7 @@ export function fixtureBlock(overrides: Partial<HandoffBlock> = {}): HandoffBloc
   };
 }
 
-/** An assistant entry, with the `copy_paste` calls it made. */
+/** An assistant entry, with the `code_handoff` calls it made. */
 export function assistantEntry(text: string, calls: string[] = []): SessionEntryLike {
   return {
     type: "message",
@@ -30,13 +30,13 @@ export function assistantEntry(text: string, calls: string[] = []): SessionEntry
       role: "assistant",
       content: [
         ...(text === "" ? [] : [{ type: "text", text }]),
-        ...calls.map((id) => ({ type: "toolCall", id, name: "copy_paste" })),
+        ...calls.map((id) => ({ type: "toolCall", id, name: "code_handoff" })),
       ],
     },
   };
 }
 
-/** A tool result entry carrying a block, the way `copy_paste` stores one. */
+/** A tool result entry carrying a block, the way `code_handoff` stores one. */
 export function toolResultEntry(toolCallId: string, block: unknown): SessionEntryLike {
   return {
     type: "message",
@@ -57,7 +57,7 @@ export async function git(cwd: string, ...args: string[]): Promise<string> {
 }
 
 export async function makeRepo(files: Record<string, string> = {}): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), "pi-copy-paste-test-"));
+  const directory = await mkdtemp(join(tmpdir(), "pi-code-handoff-test-"));
   await git(directory, "init", "-q");
   await git(directory, "config", "user.email", "test@example.com");
   await git(directory, "config", "user.name", "Test");
@@ -72,7 +72,7 @@ export async function makeRepo(files: Record<string, string> = {}): Promise<stri
 }
 
 export async function makeDirectory(): Promise<string> {
-  return mkdtemp(join(tmpdir(), "pi-copy-paste-plain-"));
+  return mkdtemp(join(tmpdir(), "pi-code-handoff-plain-"));
 }
 
 export async function remove(directory: string): Promise<void> {
@@ -239,7 +239,7 @@ export function loadExtension(directory: string): Harness {
     content: ids.map((id) => ({
       type: "toolCall",
       id,
-      name: "copy_paste",
+      name: "code_handoff",
       arguments: {},
     })),
   });

@@ -13,7 +13,9 @@ import { type Static, Type } from "typebox";
 import { countDiff, splitText, unifiedDiff } from "./diff.ts";
 import { checkCommand, checkPatch, repositoryRoot } from "./git.ts";
 import {
+  COMMAND_NAME,
   ROW_NOTE,
+  TOOL_NAME,
   commandCaption,
   diffCaption,
   fullCaption,
@@ -46,7 +48,7 @@ const schema = Type.Object({
   purpose: Type.Optional(Type.String()),
 });
 
-type CopyPasteInput = Static<typeof schema>;
+type CodeHandoffInput = Static<typeof schema>;
 
 interface BlockResult {
   block: HandoffBlock;
@@ -81,7 +83,7 @@ function requireText(value: string | undefined, field: string, kind: string): st
   return value;
 }
 
-function rejectPresent(params: CopyPasteInput, names: (keyof CopyPasteInput)[]): void {
+function rejectPresent(params: CodeHandoffInput, names: (keyof CodeHandoffInput)[]): void {
   for (const name of names) {
     if (params[name] !== undefined) {
       throw new Error(`${name} does not apply to this call shape; remove it.`);
@@ -91,7 +93,7 @@ function rejectPresent(params: CopyPasteInput, names: (keyof CopyPasteInput)[]):
 
 async function buildBlock(
   toolCallId: string,
-  params: CopyPasteInput,
+  params: CodeHandoffInput,
   cwd: string,
   claimedPaths: Set<string>,
 ): Promise<BlockResult> {
@@ -158,7 +160,7 @@ async function buildBlock(
 
 async function buildCodeBlock(
   toolCallId: string,
-  params: CopyPasteInput,
+  params: CodeHandoffInput,
   absolute: string,
   path: string,
   exists: boolean,
@@ -317,7 +319,7 @@ function plainCaption(caption: string): string {
  * The picker for the last turn: `turnBlocks` picks the blocks, `pickerFor`
  * picks the tab. A reply with no blocks still opens, so the notice can say so.
  */
-async function openCopyPicker(ctx: ExtensionContext): Promise<void> {
+async function openHandoffPicker(ctx: ExtensionContext): Promise<void> {
   if (ctx.mode !== "tui") {
     ctx.ui.notify("The copy picker needs interactive mode.", "error");
     return;
@@ -355,7 +357,7 @@ async function openCopyPicker(ctx: ExtensionContext): Promise<void> {
  * result's `details`, which is what the picker copies. The assistant message is
  * left alone: prose is prose, and a block is a row.
  */
-export default function piCopyPaste(pi: ExtensionAPI): void {
+export default function piCodeHandoff(pi: ExtensionAPI): void {
   let claimedPaths = new Set<string>();
 
   pi.on("session_start", async () => {
@@ -368,23 +370,23 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     if (event.message.role === "user") claimedPaths = new Set();
   });
 
-  pi.registerCommand("copy-paste", {
+  pi.registerCommand(COMMAND_NAME, {
     description: "Pick a block from the last turn and copy it",
     handler: async (_args, ctx) => {
-      await openCopyPicker(ctx);
+      await openHandoffPicker(ctx);
     },
   });
 
   pi.registerShortcut("ctrl+shift+c", {
     description: "Pick a block from the last turn and copy it",
     handler: async (ctx) => {
-      await openCopyPicker(ctx);
+      await openHandoffPicker(ctx);
     },
   });
 
   pi.registerTool({
-    name: "copy_paste",
-    label: "Copy Paste",
+    name: TOOL_NAME,
+    label: "Code Handoff",
     description:
       "Validate a change, then draw a copyable hand-off block in this tool's row. " +
       `${ROW_NOTE} ` +
@@ -398,13 +400,13 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       "One block per path per reply.",
     promptSnippet: "Validate a change and draw a copyable hand-off block in the tool's row",
     promptGuidelines: [
-      `Use copy_paste to hand off code or shell commands. ${ROW_NOTE} The human copies the block ` +
+      `Use ${TOOL_NAME} to hand off code or shell commands. ${ROW_NOTE} The human copies the block ` +
         "with the picker (ctrl+shift+c) or by expanding the row.",
     ],
     parameters: schema,
     async execute(
       toolCallId: string,
-      params: CopyPasteInput,
+      params: CodeHandoffInput,
       _signal: AbortSignal | undefined,
       _onUpdate: unknown,
       ctx: ExtensionToolContext,
@@ -418,7 +420,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
-          content: [{ type: "text" as const, text: `copy_paste failed: ${message}` }],
+          content: [{ type: "text" as const, text: `${TOOL_NAME} failed: ${message}` }],
           details: undefined,
           isError: true,
         };
@@ -433,7 +435,7 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     },
     renderResult(result, { expanded, isPartial }, theme, context) {
       const block = handoffBlockOf(result.details?.block);
-      const name = theme.fg("toolTitle", theme.bold("copy_paste"));
+      const name = theme.fg("toolTitle", theme.bold(TOOL_NAME));
       if (isPartial || block === undefined) {
         // A refusal, or a stream that has not produced a block yet: the row says
         // what the result says, and pi's own error colouring carries the rest.

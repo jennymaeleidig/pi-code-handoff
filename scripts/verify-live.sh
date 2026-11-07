@@ -276,7 +276,7 @@ TOTAL_STAGES=7
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP_ROOT="${TMPDIR:-/tmp}"
-STATE="${PI_COPY_PASTE_VERIFY_STATE:-${TMP_ROOT%/}/pi-copy-paste-verify}"
+STATE="${PI_CODE_HANDOFF_VERIFY_STATE:-${TMP_ROOT%/}/pi-code-handoff-verify}"
 SCRATCH="$STATE/repo"
 ENV_FILE="$STATE/state.env"
 REPORT="$REPO/docs/verification/live-$(date +%Y-%m-%d-%H%M%S).md"
@@ -323,8 +323,8 @@ done
 # The payload stages read what the picker wrote through this shell's clipboard. When
 # that is not the same clipboard pi writes to, the checks cannot run, and pretending
 # otherwise is how an unread clipboard gets reported as a lost trailing newline.
-if printf 'pi-copy-paste probe' | clip_write 2>/dev/null &&
-  [[ "$(clip_read 2>/dev/null)" == 'pi-copy-paste probe' ]]; then
+if printf 'pi-code-handoff probe' | clip_write 2>/dev/null &&
+  [[ "$(clip_read 2>/dev/null)" == 'pi-code-handoff probe' ]]; then
   CLIPBOARD_OK=yes
   note "✓ the clipboard round-trips through this shell"
 else
@@ -338,12 +338,12 @@ fi
 # loads in every project and would splice a hand-off section again, so the session
 # below disables extension discovery and loads this checkout explicitly. Say so when
 # the install is there, because a run with two copies loaded proves nothing.
-if command -v pi >/dev/null 2>&1 && pi list 2>/dev/null | grep -q 'pi-copy-paste'; then
-  PI_COPY_PASTE_INSTALLED=yes
-  note "✓ pi-copy-paste is installed as a package (it is excluded from this run)"
+if command -v pi >/dev/null 2>&1 && pi list 2>/dev/null | grep -q 'pi-code-handoff'; then
+  PI_CODE_HANDOFF_INSTALLED=yes
+  note "✓ pi-code-handoff is installed as a package (it is excluded from this run)"
 else
-  PI_COPY_PASTE_INSTALLED=no
-  note "pi-copy-paste is not installed as a package; nothing to collide with"
+  PI_CODE_HANDOFF_INSTALLED=no
+  note "pi-code-handoff is not installed as a package; nothing to collide with"
 fi
 # Always start from the seeded tree: a tree still carrying the last run's applied
 # changes would let this run's checks pass without anything being pasted.
@@ -365,7 +365,7 @@ note "✓ seeded $SCRATCH/src/greeting.ts"
 cat > "$STATE/prompt.txt" <<'TXT'
 Rename the exported function greet to greeting in src/greeting.ts, and create
 src/index.ts that re-exports greeting with an explicit return type. Hand both off
-with copy_paste. Do not edit the files yourself.
+with code_handoff. Do not edit the files yourself.
 TXT
 note "the request to send is in $STATE/prompt.txt"
 clear_state
@@ -385,18 +385,18 @@ say "Route 1 proves the row and nothing else. Routes 2 and 3 load your whole sta
 say "route 3 is the compatibility check, and the only one that puts pi-zentui and"
 say "pi-compact-transcript beside this change. Both need the installed copy gone"
 say "first, or the previous version answers too and splices a section back in:"
-step "pi remove git:github.com/jennymaeleidig/pi-copy-paste"
+step "pi remove git:github.com/jennymaeleidig/pi-code-handoff"
 ask SESSION_ROUTE "Which route did you take, 1, 2 or 3?" || true
 write_env SESSION_ROUTE "${SESSION_ROUTE:-unrecorded}"
 pause "Press Enter once the session is up"
 say "Then send the request in $STATE/prompt.txt (print it with: cat $STATE/prompt.txt):"
 note "    Rename the exported function greet to greeting in src/greeting.ts, and"
 note "    create src/index.ts that re-exports greeting with an explicit return type."
-note "    Hand both off with copy_paste. Do not edit the files yourself."
+note "    Hand both off with code_handoff. Do not edit the files yourself."
 say "The reply should carry two hand-off rows and no hand-off section:"
-step "each row is one line: '✓ copy_paste', the caption (src/greeting.ts — N hunk), and a"
+step "each row is one line: '✓ code_handoff', the caption (src/greeting.ts — N hunk), and a"
 step "  hint for expanding it, ctrl+o unless you rebound that key"
-step "the rows sit at the copy_paste calls, above the reply's own prose"
+step "the rows sit at the code_handoff calls, above the reply's own prose"
 step "the prose, and nothing else, follows them; there is no '## Hand-off' section"
 note "Leave pi running; the next stages use that session."
 pause "Press Enter once both rows are on screen"
@@ -405,7 +405,7 @@ write_env HANDOFF_OK "$HANDOFF_OK"
 
 stage "Pick the diff with the picker"
 say "In the pi session, on that same reply:"
-step "press Ctrl+Shift+C, or run /copy-paste"
+step "press Ctrl+Shift+C, or run /code-handoff"
 step "the overlay should open on the Hand-off tab, its items labelled by caption"
 step "choose the src/greeting.ts item and press enter"
 step "press 2 for the Agent reply tab: it lists the reply's prose blocks only, then 1"
@@ -534,7 +534,7 @@ mkdir -p "$REPO/docs/verification"
   printf 'and the clipboard payload checked against git. Applying it is the applier\x27s\n'
   printf 'business, and out of scope.\n\n'
   printf '| Criterion | Result |\n| --- | --- |\n'
-  printf '| One `copy_paste` call yields one row, and the reply gains no section | %s |\n' "$HANDOFF_OK"
+  printf '| One `code_handoff` call yields one row, and the reply gains no section | %s |\n' "$HANDOFF_OK"
   printf '| The picker copies the body alone, no fence and a trailing newline | %s |\n' "$PICKER_PAYLOAD_OK"
   printf '| git apply --check accepts the picked payload | %s |\n' "$PATCH_APPLIES"
   printf '| The row expands to the block and collapses back | %s |\n' "$ROW_OK"
@@ -549,8 +549,8 @@ mkdir -p "$REPO/docs/verification"
   printf -- '- node: %s\n' "$NODE_VERSION"
   printf -- '- scratch repository: `%s`\n' "$SCRATCH"
   printf -- '- clipboard readable from the shell: %s\n' "$CLIPBOARD_OK"
-  printf -- '- pi-copy-paste also installed as a package (excluded from the run): %s\n' \
-    "$PI_COPY_PASTE_INSTALLED"
+  printf -- '- pi-code-handoff also installed as a package (excluded from the run): %s\n' \
+    "$PI_CODE_HANDOFF_INSTALLED"
   printf -- '- session route: %s (1 = checkout with -ne, 2 = installed, 3 = checkout plus your stack)\n' \
     "${SESSION_ROUTE:-unrecorded}"
 } > "$REPORT"

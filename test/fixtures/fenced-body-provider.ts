@@ -97,13 +97,13 @@ export default function fencedBodyProvider(pi: ExtensionAPI): void {
     ],
     streamSimple(model: Model<string>, context: TranscriptContext) {
       const results = context.messages.filter(
-        (message) => message.role === "toolResult" && message.toolName === "copy_paste",
+        (message) => message.role === "toolResult" && message.toolName === "code_handoff",
       ).length;
 
       if (results === 0) {
         return respond(model, "", {
           id: "call-notes",
-          name: "copy_paste",
+          name: "code_handoff",
           arguments: {
             kind: "code",
             path: "notes.md",

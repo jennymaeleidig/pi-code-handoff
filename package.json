@@ -1,7 +1,7 @@
 {
-  "name": "pi-copy-paste",
-  "version": "2.0.0",
-  "description": "Aider-style copy/paste hand-off blocks for pi",
+  "name": "pi-code-handoff",
+  "version": "3.0.0",
+  "description": "Aider-style hand-off blocks for pi: a validated diff, whole file or shell command the human copies out of the tool's row",
   "type": "module",
   "license": "CC0-1.0",
   "keywords": [
@@ -9,15 +9,15 @@
     "pi-extension",
     "diff",
     "patch",
-    "copy-paste"
+    "code-handoff"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/jennymaeleidig/pi-copy-paste.git"
+    "url": "git+https://github.com/jennymaeleidig/pi-code-handoff.git"
   },
-  "homepage": "https://github.com/jennymaeleidig/pi-copy-paste#readme",
+  "homepage": "https://github.com/jennymaeleidig/pi-code-handoff#readme",
   "bugs": {
-    "url": "https://github.com/jennymaeleidig/pi-copy-paste/issues"
+    "url": "https://github.com/jennymaeleidig/pi-code-handoff/issues"
   },
   "engines": {
     "node": ">=22.22.1"

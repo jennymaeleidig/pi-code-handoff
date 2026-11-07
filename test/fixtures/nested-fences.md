@@ -23,7 +23,7 @@ four-backtick fence.
 
 ## Hand-off
 
-`Run the scratch copy_paste demo script` — command
+`Run the scratch code_handoff demo script` — command
 
 ```bash
 python3 /tmp/handoff_demo.py

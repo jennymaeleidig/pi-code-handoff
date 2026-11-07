@@ -1,4 +1,4 @@
-# pi-copy-paste
+# pi-code-handoff
 
 Turns a proposed change into a validated, copyable artifact — a **hand-off block** — and puts
 it in a row of its own under the reply, where a picker can reach it and an applier outside pi
@@ -7,8 +7,8 @@ can consume it. The extension never writes to the target repository and never ap
 ````text
 you:    Move parseKey into src/keys.ts and hand it off.
 
-pi:     ✓ copy_paste src/index.ts — 2 hunks        ctrl+o to show the block
-        ✓ copy_paste src/keys.ts — new file, 18 lines   ctrl+o to show the block
+pi:     ✓ code_handoff src/index.ts — 2 hunks        ctrl+o to show the block
+        ✓ code_handoff src/keys.ts — new file, 18 lines   ctrl+o to show the block
 
         Both files are ready. `parseKey` moved without changing what it parses.
 
@@ -28,7 +28,7 @@ pi:     ✓ copy_paste src/index.ts — 2 hunks        ctrl+o to show the block
 The usual way, from anywhere — pi clones the repository and reconciles the tag:
 
 ```sh
-pi install git:github.com/jennymaeleidig/pi-copy-paste@v2.0.0
+pi install git:github.com/jennymaeleidig/pi-code-handoff@v3.0.0
 ```
 
 A tag or commit pins the install; omit it to follow the default branch. This is a personal
@@ -52,7 +52,7 @@ An installed package loads on the next start, and `/reload` picks it up in a run
 
 ## Ask for a hand-off
 
-The extension registers one tool, `copy_paste`, and the assistant calls it. You ask in words:
+The extension registers one tool, `code_handoff`, and the assistant calls it. You ask in words:
 
 > Rename `countDiff` to `countHunks` and hand it off.
 
@@ -78,7 +78,7 @@ purpose of the command it carries. That caption is what the picker lists.
 
 ## Take the block
 
-**The picker.** Press `Ctrl+Shift+C` or run `/copy-paste`. The overlay opens on the **hand-off
+**The picker.** Press `Ctrl+Shift+C` or run `/code-handoff`. The overlay opens on the **hand-off
 tab** when this reply has validated blocks, and on the Agent reply tab when it does not.
 
 - `↑` `↓` move, `enter` copies, `esc` cancels.
@@ -113,7 +113,7 @@ fence and the blocks nested inside it arrive decorated exactly as the message ha
 
 **The block on screen.** A block is a row, not message text, so nothing about it lands in the
 reply's prose. `ctrl+o` expands every row (and a left click expands one), showing the block
-itself — caption, fence and payload. Collapsed, the row is one line: `✓ copy_paste`, the caption,
+itself — caption, fence and payload. Collapsed, the row is one line: `✓ code_handoff`, the caption,
 and the hint. The reply's own text is untouched: the model did not write the block, and the block
 is not written into what the model said.
 

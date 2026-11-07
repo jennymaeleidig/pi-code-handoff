@@ -18,7 +18,7 @@ function reply(text: string, calls: string[] = []) {
       role: "assistant",
       content: [
         ...(text === "" ? [] : [{ type: "text", text }]),
-        ...calls.map((id) => ({ type: "toolCall", id, name: "copy_paste" })),
+        ...calls.map((id) => ({ type: "toolCall", id, name: "code_handoff" })),
       ],
     },
   };
@@ -31,18 +31,18 @@ function result(id: string, value: unknown) {
   };
 }
 
-test("registers /copy-paste and ctrl+shift+c", () => {
+test("registers /code-handoff and ctrl+shift+c", () => {
   const harness = loadExtension("/tmp");
-  assert.ok(harness.commands.has("copy-paste"));
+  assert.ok(harness.commands.has("code-handoff"));
   assert.ok(harness.shortcuts.has("ctrl+shift+c"));
-  assert.match(harness.commands.get("copy-paste")!.description!, /copy/i);
+  assert.match(harness.commands.get("code-handoff")!.description!, /copy/i);
 });
 
 test("the hand-off tab opens over the blocks the last turn's calls produced", async () => {
   const harness = loadExtension("/tmp");
   const branch = [assistantEntry("Here you go.", ["call-1"]), toolResultEntry("call-1", block)];
 
-  const { notices, rendered } = await harness.runCommand("copy-paste", { branch });
+  const { notices, rendered } = await harness.runCommand("code-handoff", { branch });
 
   assert.deepEqual(notices, [], "opening the picker is not itself a notification");
   assert.ok(rendered, "the picker did not render");
@@ -54,7 +54,7 @@ test("no hand-off blocks: the picker opens on the Agent reply tab and says so", 
   const harness = loadExtension("/tmp");
   const branch = [assistantEntry("Text.\n\n```ts\nconst a = 1;\n```\n")];
 
-  const { rendered } = await harness.runCommand("copy-paste", { branch });
+  const { rendered } = await harness.runCommand("code-handoff", { branch });
 
   assert.ok(rendered!.some((line) => /No hand-off blocks/.test(line)));
   assert.ok(rendered!.some((line) => /\[ts\] — line 3/.test(line)));
@@ -62,13 +62,13 @@ test("no hand-off blocks: the picker opens on the Agent reply tab and says so", 
 
 test("no assistant reply at all: the picker refuses", async () => {
   const harness = loadExtension("/tmp");
-  const { notices } = await harness.runCommand("copy-paste", { branch: [] });
+  const { notices } = await harness.runCommand("code-handoff", { branch: [] });
   assert.match(notices.join("\n"), /No assistant reply/);
 });
 
 test("a reply with no blocks still opens, offering the whole response", async () => {
   const harness = loadExtension("/tmp");
-  const { notices, rendered } = await harness.runCommand("copy-paste", {
+  const { notices, rendered } = await harness.runCommand("code-handoff", {
     branch: [assistantEntry("Just prose, no blocks.")],
   });
   assert.deepEqual(notices, []);
@@ -77,7 +77,7 @@ test("a reply with no blocks still opens, offering the whole response", async ()
 
 test("outside interactive mode the command declines instead of copying", async () => {
   const harness = loadExtension("/tmp");
-  const { notices } = await harness.runCommand("copy-paste", { mode: "print" });
+  const { notices } = await harness.runCommand("code-handoff", { mode: "print" });
   assert.match(notices.join("\n"), /interactive mode/);
 });
 

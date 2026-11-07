@@ -1,4 +1,4 @@
-# pi-copy-paste
+# pi-code-handoff
 
 Turns a proposed change into a validated, copyable artifact — a hand-off block — and puts it
 in a row of its own under the reply, where a picker can reach it and an applier can consume it.
@@ -7,7 +7,7 @@ The extension never writes to the target repository.
 ## Language
 
 **Hand-off block**:
-One fenced artifact, drawn in the tool row of the `copy_paste` call that produced it, that a
+One fenced artifact, drawn in the tool row of the `code_handoff` call that produced it, that a
 human copies out and applies outside pi.
 _Avoid_: Snippet, patch output, copy block
 
@@ -69,7 +69,7 @@ dotfiles; this package only promises what it receives.
 _Avoid_: Consumer, patcher, DiffApply
 
 **Picker**:
-`/copy-paste`'s overlay, the copy path that reaches a block from inside pi: a hand-off tab
+`/code-handoff`'s overlay, the copy path that reaches a block from inside pi: a hand-off tab
 listing this reply's validated blocks, an Agent reply tab listing the reply's own markdown
 blocks, a count in brackets on each tab, a preview of the highlighted block, and a position
 counter once there is more than one block to tell apart.

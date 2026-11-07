@@ -41,7 +41,7 @@ the heading a section would need — its count, its rule — exists here.
 
 ## Two copy paths
 
-- **Picker path** (`/copy-paste`, `Ctrl+Shift+C`): the hand-off tab copies the block the
+- **Picker path** (`/code-handoff`, `Ctrl+Shift+C`): the hand-off tab copies the block the
   extension validated rather than re-reading rendered markdown, so a `diff` block's clipboard
   payload is a bare patch and needs no fence handling at all. That promise covers the hand-off
   tab alone: the picker's Agent reply tab reads markdown back out of the message text and promises

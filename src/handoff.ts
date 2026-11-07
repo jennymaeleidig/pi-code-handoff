@@ -26,6 +26,17 @@ export interface HandoffBlock {
 export const ROW_NOTE =
   "The harness draws the block in this tool's row, not in your reply; do not repeat it.";
 
+/**
+ * The tool's name, in one place. Five things have to agree on it: the
+ * registration, the guideline the model reads, the row title, the refusal text,
+ * and the session scan that finds a turn's blocks. A mismatch in the last one is
+ * silent — the picker simply finds nothing — so nothing spells it out twice.
+ */
+export const TOOL_NAME = "code_handoff";
+
+/** The picker's slash command, named to match the tool. */
+export const COMMAND_NAME = "code-handoff";
+
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
 }

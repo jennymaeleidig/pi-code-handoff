@@ -8,6 +8,7 @@ import { existsSync, statSync } from "node:fs";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { TOOL_NAME } from "./handoff.ts";
 
 interface RunResult {
   code: number;
@@ -55,7 +56,7 @@ export async function repositoryRoot(target: string): Promise<string> {
   const root = result.stdout.trim();
   if (result.code !== 0 || root === "") {
     throw new Error(
-      `"${target}" is not inside a git repository. copy_paste only hands off changes that ` +
+      `"${target}" is not inside a git repository. ${TOOL_NAME} only hands off changes that ` +
         `\`git apply\` can check, so initialize or move into a repository first.`,
     );
   }
@@ -72,7 +73,7 @@ export async function checkPatch(root: string, patch: string): Promise<void> {
 
 /** Syntax-check a shell command with `bash -n` on a temporary file. */
 export async function checkCommand(command: string): Promise<void> {
-  const directory = await mkdtemp(join(tmpdir(), "pi-copy-paste-"));
+  const directory = await mkdtemp(join(tmpdir(), "pi-code-handoff-"));
   const file = join(directory, "command.sh");
   try {
     await writeFile(file, command, "utf8");

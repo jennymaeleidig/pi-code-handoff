@@ -73,7 +73,7 @@ test("collapsed, a row is one line naming the block", async () => {
     const lines = component.render(80);
     assert.equal(lines.length, 1, `a collapsed row is one line:\n${lines.join("\n")}`);
     const line = lines[0]!;
-    assert.match(line, /copy_paste/);
+    assert.match(line, /code_handoff/);
     assert.match(line, /a\.ts/);
     assert.match(line, /1 hunk/);
     assert.match(line, /ctrl\+o to show the block/);
@@ -106,7 +106,7 @@ test("expanded, the row is the block, in its own fence", async () => {
 
     const lines = component.render(80);
     const text = lines.join("\n");
-    assert.match(text, /copy_paste/, "an expanded row keeps the tool's name, like any other row");
+    assert.match(text, /code_handoff/, "an expanded row keeps the tool's name, like any other row");
     assert.match(text, /a\.ts/);
     assert.match(text, /@@ -1,2 \+1,2 @@/);
     assert.match(text, /\+TWO/);
@@ -136,7 +136,7 @@ test("a refusal renders as the result's own words", async () => {
     ) as unknown as Renderable;
 
     const text = component.render(80).join("\n");
-    assert.match(text, /copy_paste failed/);
+    assert.match(text, /code_handoff failed/);
     assert.match(text, /missing\.ts/);
   } finally {
     await remove(repo);

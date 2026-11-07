@@ -44,7 +44,7 @@ test("with no user message, only the last assistant message's calls count", () =
   assert.deepEqual(lastTurn(entries), { text: "newer", calls: ["call-new"] });
 });
 
-test("only copy_paste calls count as hand-off calls", () => {
+test("only code_handoff calls count as hand-off calls", () => {
   const entries = [
     userEntry(),
     {
@@ -53,7 +53,7 @@ test("only copy_paste calls count as hand-off calls", () => {
         role: "assistant",
         content: [
           { type: "toolCall", id: "read-1", name: "read" },
-          { type: "toolCall", id: "call-1", name: "copy_paste" },
+          { type: "toolCall", id: "call-1", name: "code_handoff" },
         ],
       },
     },

@@ -15,7 +15,7 @@ Treat that declaration as a temporary harness, not repo state.
 
 ### Issue tracker
 
-Issues live in GitHub Issues for `jennymaeleidig/pi-copy-paste`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+Issues live in GitHub Issues for `jennymaeleidig/pi-code-handoff`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
