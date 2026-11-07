@@ -28,7 +28,7 @@ pi:     ✓ copy_paste src/index.ts — 2 hunks        ctrl+o to show the block
 The usual way, from anywhere — pi clones the repository and reconciles the tag:
 
 ```sh
-pi install git:github.com/jennymaeleidig/pi-copy-paste@v1.0.0
+pi install git:github.com/jennymaeleidig/pi-copy-paste@v2.0.0
 ```
 
 A tag or commit pins the install; omit it to follow the default branch. This is a personal

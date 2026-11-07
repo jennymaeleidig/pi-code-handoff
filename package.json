@@ -1,6 +1,6 @@
 {
   "name": "pi-copy-paste",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Aider-style copy/paste hand-off blocks for pi",
   "type": "module",
   "license": "CC0-1.0",

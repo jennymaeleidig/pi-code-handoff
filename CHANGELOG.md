@@ -8,13 +8,19 @@ follows [Semantic Versioning][].
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-07
+
+A hand-off block is its own row now, so the reply is prose and only prose. This is a major
+version because the whole-reply path the contract used to promise is retired: `/copy` no longer
+hands you a block to strip by hand, and the splice is gone.
+
 ### Changed
 
 - **A hand-off block is a row now, not message text.** The spliced `## Hand-off` section is gone:
   a block travels as its `copy_paste` tool result's `details` and is drawn in that call's row.
   Collapsed, the row is one line — `✓ copy_paste`, the caption, and `ctrl+o to show the block`;
-  expanded — `ctrl+o`, or a left click — it is the block itself, caption, fence and payload.
-  `renderCall` draws nothing, because pi stacks the call region above the result region and two
+  expanded — `ctrl+o`, or a left click — it is the tool's name and then the block itself, caption,
+  fence and payload, so it reads like any other row. `renderCall` draws nothing, because pi stacks the call region above the result region and two
   slots would mean two lines. The reply is prose and only prose, so a long hand-off no longer
   buries the answer, and a block no longer re-enters the model's context on every later turn.
 - **The picker reads blocks out of the turn's tool results**, matched by call id, so there is no
@@ -69,5 +75,6 @@ applier, with the text guaranteed to apply before it ever reaches the clipboard.
   design decisions behind the picker — the splice, and owning the picker rather than delegating
   to an external clipper.
 
-[unreleased]: https://github.com/jennymaeleidig/pi-copy-paste/compare/v1.0.0...HEAD
+[unreleased]: https://github.com/jennymaeleidig/pi-copy-paste/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/jennymaeleidig/pi-copy-paste/releases/tag/v2.0.0
 [1.0.0]: https://github.com/jennymaeleidig/pi-copy-paste/releases/tag/v1.0.0
