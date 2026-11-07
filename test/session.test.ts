@@ -1,112 +1,140 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { HandoffBlock } from "../src/handoff.ts";
-import {
-  HANDOFF_ENTRY,
-  handoffEntry,
-  lastReply,
-  replyBlocks,
-  type SessionEntryLike,
-  storedBlocks,
-} from "../src/session.ts";
+import { lastTurn, turnBlocks } from "../src/session.ts";
+import { assistantEntry, fixtureBlock, toolResultEntry, userEntry } from "./helpers.ts";
 
-const block: HandoffBlock = {
-  toolCallId: "call-1",
-  kind: "code",
-  form: "diff",
-  path: "greet.py",
-  body: "--- a/greet.py\n+++ b/greet.py\n@@ -1 +1 @@\n-old\n+new\n",
-  lang: "diff",
-  caption: "`greet.py` — 1 hunk",
-};
+const block = fixtureBlock();
 
-function assistant(timestamp: number, text: string): SessionEntryLike {
-  return {
-    type: "message",
-    message: { role: "assistant", timestamp, content: [{ type: "text", text }] },
-  };
-}
-
-function stored(timestamp: number | null, blocks: HandoffBlock[]): SessionEntryLike {
-  return { type: "custom", customType: HANDOFF_ENTRY, data: handoffEntry(timestamp, blocks) };
-}
-
-test("the last reply is the last assistant message with text on the branch", () => {
-  const entries = [
-    { type: "message", message: { role: "user", content: [{ type: "text", text: "hi" }] } },
-    assistant(100, "first"),
-    { type: "message", message: { role: "assistant", content: [{ type: "toolCall" }] } },
-    assistant(200, "second"),
-    stored(200, [block]),
-  ];
-  assert.deepEqual(lastReply(entries), { timestamp: 200, text: "second" });
+test("the last turn is what the last user message opened", () => {
+  const entries = [userEntry(), assistantEntry("first"), assistantEntry("second")];
+  assert.deepEqual(lastTurn(entries), { text: "second", calls: [] });
 });
 
-test("no assistant reply yields undefined", () => {
-  assert.equal(lastReply([]), undefined);
-  assert.equal(
-    lastReply([
-      { type: "message", message: { role: "user", content: [{ type: "text", text: "hi" }] } },
-    ]),
-    undefined,
+test("a turn that handed off and then spoke keeps both halves", () => {
+  const entries = [userEntry(), assistantEntry("here you go", ["call-1"])];
+  entries.push(assistantEntry("Anything else?"));
+  assert.deepEqual(lastTurn(entries), { text: "Anything else?", calls: ["call-1"] });
+});
+
+test("a turn that handed off without prose is still the turn", () => {
+  assert.deepEqual(lastTurn([userEntry(), assistantEntry("", ["call-1"])]), {
+    text: "",
+    calls: ["call-1"],
+  });
+});
+
+test("a user message starts a new turn, and the previous turn's calls are gone", () => {
+  const entries = [
+    userEntry(),
+    assistantEntry("here you go", ["call-old"]),
+    toolResultEntry("call-old", block),
+    userEntry("again"),
+    assistantEntry("working on it"),
+  ];
+  assert.deepEqual(lastTurn(entries), { text: "working on it", calls: [] });
+});
+
+test("with no user message, only the last assistant message's calls count", () => {
+  const entries = [
+    assistantEntry("older", ["call-old"]),
+    toolResultEntry("call-old", block),
+    assistantEntry("newer", ["call-new"]),
+    toolResultEntry("call-new", { ...block, toolCallId: "call-new" }),
+  ];
+  assert.deepEqual(lastTurn(entries), { text: "newer", calls: ["call-new"] });
+});
+
+test("only copy_paste calls count as hand-off calls", () => {
+  const entries = [
+    userEntry(),
+    {
+      type: "message",
+      message: {
+        role: "assistant",
+        content: [
+          { type: "toolCall", id: "read-1", name: "read" },
+          { type: "toolCall", id: "call-1", name: "copy_paste" },
+        ],
+      },
+    },
+  ];
+  assert.deepEqual(lastTurn(entries)?.calls, ["call-1"]);
+});
+
+test("no turn yields undefined", () => {
+  assert.equal(lastTurn([]), undefined);
+  assert.equal(lastTurn([userEntry()]), undefined);
+  assert.equal(lastTurn([userEntry(), assistantEntry("")]), undefined);
+});
+
+test("a block survives a JSON round trip byte for byte", () => {
+  const entries = [userEntry(), assistantEntry("reply", ["call-1"])];
+  const stored = JSON.parse(JSON.stringify(toolResultEntry("call-1", block))) as never;
+  const turn = lastTurn(entries)!;
+  const blocks = turnBlocks([...entries, stored], turn);
+  assert.deepEqual(blocks, [block]);
+  assert.equal(blocks[0]!.body, block.body);
+});
+
+test("blocks come back in call order, not in entry order", () => {
+  const entries = [
+    userEntry(),
+    assistantEntry("reply", ["call-b", "call-a"]),
+    toolResultEntry("call-a", { ...block, toolCallId: "call-a", caption: "`a.txt` — 1 hunk" }),
+    toolResultEntry("call-b", { ...block, toolCallId: "call-b", caption: "`b.txt` — 1 hunk" }),
+  ];
+  const turn = lastTurn(entries)!;
+  assert.deepEqual(
+    turnBlocks(entries, turn).map((found) => found.caption),
+    ["`b.txt` — 1 hunk", "`a.txt` — 1 hunk"],
   );
 });
 
-test("stored blocks survive a JSON round trip byte for byte", () => {
-  const data = JSON.parse(JSON.stringify(handoffEntry(200, [block]))) as unknown;
-  const entries = [assistant(200, "reply"), { type: "custom", customType: HANDOFF_ENTRY, data }];
-  const blocks = storedBlocks(entries, 200);
-  assert.deepEqual(blocks, [block]);
-  assert.equal(blocks![0]!.body, block.body);
-});
-
-test("blocks stored for a different assistant message are ignored", () => {
-  const entries = [assistant(200, "newer reply"), stored(100, [block])];
-  assert.equal(storedBlocks(entries, 200), undefined);
-});
-
-test("the newest matching entry wins, and malformed data is treated as absent", () => {
-  const older = { ...block, body: "older\n" };
-  const entries = [assistant(200, "reply"), stored(200, [older]), stored(200, [block])];
-  assert.equal(storedBlocks(entries, 200)![0]!.body, block.body);
-
-  const malformed: SessionEntryLike[] = [
-    assistant(200, "reply"),
-    {
-      type: "custom",
-      customType: HANDOFF_ENTRY,
-      data: { messageTimestamp: 200, blocks: [{ nope: true }] },
-    },
-  ];
-  assert.equal(storedBlocks(malformed, 200), undefined);
-});
-
-test("memory wins only when it belongs to the same reply", () => {
-  const branch = [assistant(200, "reply"), stored(200, [block])];
-  const reply = lastReply(branch)!;
-  const memory = { ...block, body: "from memory\n" };
-
-  assert.equal(replyBlocks(branch, reply, handoffEntry(200, [memory]))[0]!.body, "from memory\n");
-  assert.equal(replyBlocks(branch, reply, handoffEntry(100, [memory]))[0]!.body, block.body);
-  assert.equal(replyBlocks(branch, reply, handoffEntry(null, [memory]))[0]!.body, block.body);
-  assert.equal(replyBlocks(branch, reply, undefined)[0]!.body, block.body);
-});
-
-test("a reply without a timestamp falls back to the Agent reply tab, not to stale memory", () => {
+test("a missing or malformed result contributes nothing, and the rest keep order", () => {
   const entries = [
-    { type: "message", message: { role: "assistant", content: [{ type: "text", text: "reply" }] } },
-    stored(null, [block]),
+    userEntry(),
+    assistantEntry("reply", ["call-a", "call-b", "call-c"]),
+    toolResultEntry("call-a", { ...block, toolCallId: "call-a", caption: "`a.txt` — 1 hunk" }),
+    toolResultEntry("call-b", { nope: true }),
+    toolResultEntry("call-c", { ...block, toolCallId: "call-c", caption: "`c.txt` — 1 hunk" }),
   ];
-  const reply = lastReply(entries)!;
-  assert.equal(reply.timestamp, null);
-  assert.deepEqual(replyBlocks(entries, reply, handoffEntry(null, [block])), []);
+  const turn = lastTurn(entries)!;
+  assert.deepEqual(
+    turnBlocks(entries, turn).map((found) => found.caption),
+    ["`a.txt` — 1 hunk", "`c.txt` — 1 hunk"],
+  );
 });
 
-test("a null timestamp is not trusted to identify a reply", () => {
-  const entries = [stored(null, [block])];
-  assert.equal(storedBlocks(entries, null), undefined);
-  assert.deepEqual(storedBlocks(entries, 1), undefined);
+test("a call from an earlier message in the turn keeps its block", () => {
+  const entries = [
+    userEntry(),
+    assistantEntry("handing off", ["call-1"]),
+    toolResultEntry("call-1", block),
+    assistantEntry("here you go"),
+  ];
+  const turn = lastTurn(entries)!;
+  assert.deepEqual(turnBlocks(entries, turn), [block]);
+});
 
-  const numbered: SessionEntryLike[] = [stored(1, [block])];
-  assert.deepEqual(storedBlocks(numbered, 1), [block]);
+test("an earlier turn's results are not borrowed", () => {
+  const entries = [
+    userEntry(),
+    assistantEntry("older reply", ["call-old"]),
+    toolResultEntry("call-old", { ...block, toolCallId: "call-old" }),
+    userEntry("again"),
+    assistantEntry("newer reply"),
+  ];
+  const turn = lastTurn(entries)!;
+  assert.deepEqual(turnBlocks(entries, turn), []);
+});
+
+test("a result is read once even when the branch repeats it", () => {
+  const entries = [
+    userEntry(),
+    assistantEntry("reply", ["call-1"]),
+    toolResultEntry("call-1", block),
+    toolResultEntry("call-1", { ...block, body: "second\n" }),
+  ];
+  const turn = lastTurn(entries)!;
+  assert.equal(turnBlocks(entries, turn)[0]!.body, block.body);
 });

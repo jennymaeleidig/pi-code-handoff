@@ -10,6 +10,21 @@ follows [Semantic Versioning][].
 
 ### Changed
 
+- **A hand-off block is a row now, not message text.** The spliced `## Hand-off` section is gone:
+  a block travels as its `copy_paste` tool result's `details` and is drawn in that call's row.
+  Collapsed, the row is one line — `✓ copy_paste`, the caption, and `ctrl+o to show the block`;
+  expanded — `ctrl+o`, or a left click — it is the block itself, caption, fence and payload.
+  `renderCall` draws nothing, because pi stacks the call region above the result region and two
+  slots would mean two lines. The reply is prose and only prose, so a long hand-off no longer
+  buries the answer, and a block no longer re-enters the model's context on every later turn.
+- **The picker reads blocks out of the turn's tool results**, matched by call id, so there is no
+  custom session entry to write, no timestamp to match, and no way for a stale entry to feed a
+  newer turn. A turn is bounded by user messages, which is what a turn with several assistant
+  messages needs; a branch with no user message falls back to its last assistant message rather
+  than to every block it ever produced.
+- **`/copy` and transcript selection no longer carry a block.** Intended: the row is the reading
+  path and the picker is the copy path. Export and any reader that wants a block reads its result;
+  an expanded row is Markdown on a screen, so a selection from it wraps and indents.
 - **The picker's Agent reply tab copies a code block as code.** A fence tagged as anything but
   `md` — `diff`, `ts`, `bash`, or nothing at all — now contributes its body alone, with the
   trailing newline a fenced body cannot carry put back, so a patch or a snippet arrives

@@ -1,6 +1,7 @@
 /**
- * Presentation of hand-off blocks: captions, fences, and the section that the
- * message_end handler splices into the assistant message.
+ * Presentation of hand-off blocks: captions, and the fences a block is drawn
+ * in. A block belongs to the tool row that produced it, never to the assistant
+ * message.
  */
 
 export interface HandoffBlock {
@@ -15,8 +16,15 @@ export interface HandoffBlock {
   caption: string;
 }
 
-export const SPLICED_NOTE =
-  "The harness splices the block into your reply; do not write it yourself.";
+/**
+ * What the model is told instead of the block appearing in its reply. It lives
+ * in the tool's description and its prompt guidelines, never in a result: a
+ * result's text is the only thing some renderers show (pi-compact-transcript
+ * draws its collapsed row from it), so what a result says stays short and about
+ * validation.
+ */
+export const ROW_NOTE =
+  "The harness draws the block in this tool's row, not in your reply; do not repeat it.";
 
 export function plural(count: number, word: string): string {
   return `${count} ${word}${count === 1 ? "" : "s"}`;
@@ -88,15 +96,6 @@ export function renderBlock(block: HandoffBlock): string {
   const body =
     block.body === "" ? "" : `${block.body.endsWith("\n") ? block.body : `${block.body}\n`}\n`;
   return `${block.caption}\n\n${fence}${block.lang}\n${body}${fence}`;
-}
-
-export function renderSection(blocks: HandoffBlock[]): string {
-  // A rule above the heading separates the hand-off from the reply's prose: a
-  // heading alone read as another paragraph of the answer. Three newlines, so
-  // the rule has a blank line on both sides of the gap it opens. The count is in
-  // the heading because the picker's tabs cannot be seen from the transcript.
-  const heading = `## Hand-off — ${plural(blocks.length, "block")}`;
-  return `\n\n\n---\n\n${heading}\n\n${blocks.map(renderBlock).join("\n\n")}\n`;
 }
 
 export function diffCaption(path: string, hunks: number): string {

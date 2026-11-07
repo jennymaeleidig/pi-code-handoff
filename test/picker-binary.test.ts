@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { createPicker, currentItem, payload, pickerFor, switchTab } from "../src/picker.ts";
-import { lastReply, type SessionEntryLike } from "../src/session.ts";
+import { lastTurn, type SessionEntryLike } from "../src/session.ts";
 import { makeRepo, remove } from "./helpers.ts";
 import { NOTES } from "./fixtures/fenced-body-provider.ts";
 
@@ -94,9 +94,9 @@ test(
         .filter((line) => line.trim() !== "")
         .map((line) => JSON.parse(line) as SessionEntryLike);
 
-      const source = pickerFor(entries, undefined);
+      const source = pickerFor(entries);
       assert.ok(source, "no assistant reply was persisted");
-      const reply = lastReply(entries)!;
+      const turn = lastTurn(entries)!;
       assert.equal(source.handoff.length, 1);
       assert.equal(source.handoff[0]!.body, NOTES, "the persisted block body changed");
 
@@ -105,17 +105,18 @@ test(
       assert.equal(currentItem(source, state)?.label, "`notes.md` — new file, 7 lines");
       assert.equal(payload(currentItem(source, state)!), NOTES);
 
-      // The rendered section fences the body with four backticks, because the
-      // body carries a three-backtick fence of its own.
-      assert.match(reply.text, /````md\n# Notes/);
-      assert.ok(reply.text.includes(NOTES), "the spliced text is not the block body");
+      // The turn is prose now: the block lives in its tool result, not in the
+      // message, so the Agent reply tab no longer sees it.
+      assert.ok(
+        !turn.text.includes(NOTES),
+        `the assistant message must not carry the block:\n${turn.text}`,
+      );
+      assert.deepEqual(turn.calls.length, 1);
 
-      // The Agent reply tab sees the same block; it is tagged md, so its fences stay
-      // around a body that is the file's text, the hand-off tab's payload exactly.
+      // The Agent reply tab is the message's own markdown, which here is nothing
+      // but prose.
       state = switchTab(state, "parsed");
-      const parsed = currentItem(source, state)!;
-      assert.equal(parsed.body, "````md\n" + NOTES + "\n````");
-      assert.ok(parsed.body.includes("```sh\necho hi\n```"));
+      assert.equal(currentItem(source, state)?.label, "[md] — full response, 1 line");
     } finally {
       await remove(repo);
       await remove(config);

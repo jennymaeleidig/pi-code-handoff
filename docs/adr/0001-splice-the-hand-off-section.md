@@ -1,5 +1,9 @@
 # Splice the hand-off section into the assistant message
 
+> Superseded by [The hand-off lives in its own row](0003-the-hand-off-lives-in-its-own-row.md).
+> The splice gave a block no way to be folded away, so the section buried the reply's prose;
+> the block now travels as the tool result's `details` and is drawn in its own row.
+
 A hand-off block is placed by code at the end of the assistant message rather than written by
 the model, because the block's whole claim is that the bytes `git apply --check` accepted are
 the bytes the human pastes: the picker reads only assistant messages, and a model asked to

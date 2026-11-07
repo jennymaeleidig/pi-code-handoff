@@ -39,15 +39,20 @@ Rejected:
 
 - The hand-off tab copies `HandoffBlock.body` directly, so the clipboard payload no longer
   depends on how any markdown scanner treats a fence. The blank line before the closing fence
-  now serves the whole-reply path alone (`/copy`, `ctrl+x`); the contract states the rule and
-  its reason.
-- The hand-off tab reads blocks the extension holds in memory, so the list is written to the
-  session once per assistant message. The Agent reply tab covers the case where that list is
-  absent — a reply from before this extension was installed, or one whose entry does not match
-  the message's timestamp — which makes it load-bearing rather than decorative.
+  now serves the expanded row alone; the contract states the rule and its reason.
+- The hand-off tab reads the blocks the turn's tool results carry, matched by call id. The Agent
+  reply tab covers the case where a turn produced none, which makes it load-bearing rather than
+  decorative.
 - This repository now owns a fence scanner, so a close longer than its opener, a close carrying
   an info string, and an unterminated block each need a test.
 - `Picker` in `GLOSSARY.md` stops meaning somebody else's overlay.
+
+## Amended
+
+[The hand-off lives in its own row](0003-the-hand-off-lives-in-its-own-row.md) removed the two
+things this decision's second consequence depended on: there is no splice, so there is no
+custom session entry, and nothing is keyed by an assistant message's timestamp. The picker still
+owns both tabs; the hand-off tab is now rebuilt from `copy_paste`'s tool results.
 
 ## Work
 

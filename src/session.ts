@@ -1,49 +1,34 @@
 /**
- * Reading the picker's data back out of a session.
+ * Reading the picker's hand-off tab back out of a session.
  *
- * The hand-off tab is written to the session once per assistant message, as a
- * custom entry carrying the blocks themselves. Reading it back requires tying
- * that entry to the message it belongs to: a custom entry from an older reply
- * must not feed the picker for a newer one, so the match is on the assistant
- * message's timestamp. When nothing matches, the caller falls back to the
- * Agent reply tab.
+ * A block *is* the `details` of the `copy_paste` tool result that produced it,
+ * so the picker needs no side channel and no correlation key: the blocks of the
+ * last turn are the blocks of the calls that turn made, in call order. A
+ * `/reload` or a resume reads the same bytes the turn wrote.
+ *
+ * Nothing identifies a turn by timestamp any more. The assistant message no
+ * longer carries the blocks, so there is nothing to tie to it: its tool calls
+ * are the tie, and they are what a tool result already points at.
  */
 
 import type { HandoffBlock } from "./handoff.ts";
 
-export const HANDOFF_ENTRY = "copy-paste-handoff";
-
-export interface StoredHandoff {
-  /** The `timestamp` of the assistant message these blocks were spliced into. */
-  messageTimestamp: number | null;
-  blocks: HandoffBlock[];
-}
-
-/** The last reply's blocks, held in memory for the picker across the turn. */
-export type HandoffMemory = StoredHandoff;
-
 /** A structural slice of a session entry, so callers need not widen their types. */
 export interface SessionEntryLike {
   type: string;
-  customType?: string;
-  data?: unknown;
   message?: {
     role?: string;
-    timestamp?: number;
     content?: unknown;
+    toolCallId?: string;
+    details?: unknown;
   };
 }
 
-export interface Reply {
-  /** The assistant message's timestamp, or null when it has none. */
-  timestamp: number | null;
+export interface Turn {
   /** Its text blocks joined the way pi renders them. */
   text: string;
-}
-
-/** Normalise an optional message timestamp to `number | null`. */
-export function messageTimestamp(value: unknown): number | null {
-  return typeof value === "number" ? value : null;
+  /** The ids of its `copy_paste` calls, in message order. */
+  calls: string[];
 }
 
 function textOf(content: unknown): string {
@@ -60,20 +45,74 @@ function textOf(content: unknown): string {
     .join("\n");
 }
 
-/** The last assistant message with text on the branch, if there is one. */
-export function lastReply(entries: readonly SessionEntryLike[]): Reply | undefined {
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index]!;
-    if (entry.type !== "message") continue;
-    if (entry.message?.role !== "assistant") continue;
-    const text = textOf(entry.message.content);
-    if (text === "") continue;
-    return { timestamp: messageTimestamp(entry.message.timestamp), text };
+/** The ids of a message's `copy_paste` calls, in the order it made them. */
+function handoffCalls(content: unknown): string[] {
+  if (!Array.isArray(content)) return [];
+  const ids: string[] = [];
+  for (const block of content) {
+    if (typeof block !== "object" || block === null) continue;
+    const call = block as { type?: unknown; id?: unknown; name?: unknown };
+    if (call.type !== "toolCall" || call.name !== "copy_paste") continue;
+    if (typeof call.id === "string") ids.push(call.id);
   }
-  return undefined;
+  return ids;
 }
 
-function handoffBlockOf(value: unknown): HandoffBlock | undefined {
+function roleOf(entry: SessionEntryLike): string | undefined {
+  return entry.type === "message" ? entry.message?.role : undefined;
+}
+
+/** Where the last assistant message sits, or -1 when the branch has none. */
+function lastAssistantIndex(entries: readonly SessionEntryLike[]): number {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (roleOf(entries[index]!) === "assistant") return index;
+  }
+  return -1;
+}
+
+/**
+ * The last turn's hand-off: the prose it wrote and the `copy_paste` calls it
+ * made. A turn is what a user message opens, so a turn that handed off and then
+ * spoke still has both halves — a tool-using turn has several assistant
+ * messages, and the blocks belong to the turn rather than to the last of them.
+ *
+ * A branch with no user message has no turn to bound, so the reply alone is its
+ * last assistant message. Borrowing every block the branch ever produced would
+ * fill the picker with blocks the human has already dealt with.
+ */
+export function lastTurn(entries: readonly SessionEntryLike[]): Turn | undefined {
+  let start = 0;
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    if (roleOf(entries[index]!) === "user") {
+      start = index + 1;
+      break;
+    }
+  }
+  if (start === 0) {
+    // No user message closed a turn, so the reply is the whole bound there is.
+    start = lastAssistantIndex(entries);
+    if (start < 0) return undefined;
+  }
+
+  let text: string | undefined;
+  const calls: string[] = [];
+  for (let index = start; index < entries.length; index += 1) {
+    const entry = entries[index]!;
+    if (roleOf(entry) !== "assistant") continue;
+    const spoken = textOf(entry.message?.content);
+    if (spoken !== "") text = spoken;
+    calls.push(...handoffCalls(entry.message?.content));
+  }
+  if (text === undefined && calls.length === 0) return undefined;
+  return { text: text ?? "", calls };
+}
+
+/**
+ * Rebuild a block from its stored form, rather than asserting its type, so a
+ * new required field on `HandoffBlock` is a compile error here instead of a
+ * silent bypass. A malformed value reads as absent.
+ */
+export function handoffBlockOf(value: unknown): HandoffBlock | undefined {
   if (typeof value !== "object" || value === null) return undefined;
   const block = value as Record<string, unknown>;
   if (
@@ -85,8 +124,6 @@ function handoffBlockOf(value: unknown): HandoffBlock | undefined {
   ) {
     return undefined;
   }
-  // Rebuilding the block, rather than asserting its type, makes a new required
-  // field on HandoffBlock a compile error here instead of a silent bypass.
   return {
     toolCallId: block.toolCallId,
     kind: block.kind,
@@ -100,49 +137,26 @@ function handoffBlockOf(value: unknown): HandoffBlock | undefined {
 }
 
 /**
- * The blocks stored for the reply with this timestamp. A stored entry for any
- * other reply is ignored, and malformed data is treated as absent. Without a
- * timestamp on both sides there is no way to tell the replies apart, so the
- * entry is not trusted.
+ * This turn's blocks, in call order, as its tool results stored them. A call
+ * whose result is missing or malformed contributes nothing; the rest keep their
+ * order, so the picker lists blocks as the turn produced them.
  */
-export function storedBlocks(
-  entries: readonly SessionEntryLike[],
-  timestamp: number | null,
-): HandoffBlock[] | undefined {
-  if (timestamp === null) return undefined;
-  for (let index = entries.length - 1; index >= 0; index -= 1) {
-    const entry = entries[index]!;
-    if (entry.type !== "custom" || entry.customType !== HANDOFF_ENTRY) continue;
-    const data = entry.data as StoredHandoff | undefined;
-    if (data === undefined || data === null || !Array.isArray(data.blocks)) continue;
-    if (messageTimestamp(data.messageTimestamp) !== timestamp) continue;
-    const blocks = data.blocks.map(handoffBlockOf);
-    if (blocks.some((block) => block === undefined)) continue;
-    return blocks as HandoffBlock[];
+export function turnBlocks(entries: readonly SessionEntryLike[], turn: Turn): HandoffBlock[] {
+  if (turn.calls.length === 0) return [];
+  const wanted = new Set(turn.calls);
+  const found = new Map<string, HandoffBlock>();
+  for (const entry of entries) {
+    if (entry.type !== "message") continue;
+    const message = entry.message;
+    if (message?.role !== "toolResult") continue;
+    const toolCallId = message.toolCallId;
+    if (typeof toolCallId !== "string" || !wanted.has(toolCallId)) continue;
+    if (found.has(toolCallId)) continue;
+    const details = message.details as { block?: unknown } | undefined;
+    const block = handoffBlockOf(details?.block);
+    if (block !== undefined) found.set(toolCallId, block);
   }
-  return undefined;
-}
-
-/**
- * The blocks for a reply: this session's memory first — byte-identical to what
- * validation accepted — then the entry written to the session (a `/reload` or
- * a resume), then nothing, so the Agent reply tab takes over.
- */
-export function replyBlocks(
-  entries: readonly SessionEntryLike[],
-  reply: Reply,
-  memory: HandoffMemory | undefined,
-): HandoffBlock[] {
-  if (
-    memory !== undefined &&
-    reply.timestamp !== null &&
-    memory.messageTimestamp === reply.timestamp
-  ) {
-    return memory.blocks;
-  }
-  return storedBlocks(entries, reply.timestamp) ?? [];
-}
-
-export function handoffEntry(timestamp: number | null, blocks: HandoffBlock[]): StoredHandoff {
-  return { messageTimestamp: timestamp, blocks };
+  return turn.calls
+    .map((id) => found.get(id))
+    .filter((block): block is HandoffBlock => block !== undefined);
 }

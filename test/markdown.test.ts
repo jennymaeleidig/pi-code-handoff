@@ -17,12 +17,12 @@ test("a code block ends in a newline, because the code line does", () => {
   assert.equal(parseMarkdownBlocks("```diff\n+x\n```")[0]!.body, "+x\n");
 });
 
-test("a spliced hand-off block reads back as the body the hand-off tab copies", () => {
+test("a hand-off block drawn in its row reads back as the body the hand-off tab copies", () => {
   // renderBlock leaves one empty line before the closer so the body keeps its
   // trailing newline; with the fences off, that blank line is the body's own.
   const body = "--- a/x\n+++ b/x\n@@ -1 +1 @@\n-old\n+new\n";
-  const section = "\`\`\`diff\n" + body + "\n\`\`\`";
-  assert.equal(parseMarkdownBlocks(section)[0]!.body, body);
+  const drawn = "\`\`\`diff\n" + body + "\n\`\`\`";
+  assert.equal(parseMarkdownBlocks(drawn)[0]!.body, body);
 });
 
 test("an md fence keeps its fences, so nested blocks stay decorated", () => {

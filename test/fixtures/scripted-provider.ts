@@ -1,10 +1,10 @@
 /**
- * A scripted provider for the real-binary splice test.
+ * A scripted provider for the real-binary row test.
  *
  * It answers without a network: the first request asks copy_paste to change
  * one file, the second asks for a second file, and later requests finish with
- * prose. That is enough to prove that the assistant entry persisted after
- * `message_end` carries the spliced blocks.
+ * prose. That is enough to prove that the blocks land on the tool results and
+ * never in the assistant entry persisted after `message_end`.
  */
 
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";

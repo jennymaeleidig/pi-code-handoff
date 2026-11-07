@@ -252,7 +252,7 @@ clear_state() {
   [[ -f "$ENV_FILE" ]] || return 0
   local tmp
   tmp=$(mktemp)
-  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|PATCH_APPLIES|WHOLE_REPLY_OK|REFLOW|REFLOW_ACCEPTABLE)=' \
+  grep -vE '^(HANDOFF_OK|PICKER_PAYLOAD_OK|PATCH_APPLIES|ROW_OK|PROSE_ONLY_OK|ROW_MOTION|ROW_MOTION_ACCEPTABLE|SESSION_ROUTE)=' \
     "$ENV_FILE" > "$tmp" || true
   cat "$tmp" > "$ENV_FILE"
   rm -f "$tmp"
@@ -282,7 +282,7 @@ ENV_FILE="$STATE/state.env"
 REPORT="$REPO/docs/verification/live-$(date +%Y-%m-%d-%H%M%S).md"
 mkdir -p "$STATE"
 
-banner "Live verification: a hand-off block from reply to clipboard"
+banner "Live verification: a hand-off block from its row to the clipboard"
 
 # A version string, or "not on PATH", so each tool is looked up once.
 version_of() {
@@ -334,6 +334,17 @@ else
   say "stages will record themselves as unchecked. Run the wizard from the same"
   say "terminal pi runs in, or paste each payload into an editor to check it by eye."
 fi
+# A second copy of this extension — the personal install most people already have —
+# loads in every project and would splice a hand-off section again, so the session
+# below disables extension discovery and loads this checkout explicitly. Say so when
+# the install is there, because a run with two copies loaded proves nothing.
+if command -v pi >/dev/null 2>&1 && pi list 2>/dev/null | grep -q 'pi-copy-paste'; then
+  PI_COPY_PASTE_INSTALLED=yes
+  note "✓ pi-copy-paste is installed as a package (it is excluded from this run)"
+else
+  PI_COPY_PASTE_INSTALLED=no
+  note "pi-copy-paste is not installed as a package; nothing to collide with"
+fi
 # Always start from the seeded tree: a tree still carrying the last run's applied
 # changes would let this run's checks pass without anything being pasted.
 if [[ -d "$SCRATCH" ]]; then
@@ -360,23 +371,36 @@ note "the request to send is in $STATE/prompt.txt"
 clear_state
 pause
 
-stage "Install it and hand off the change"
-say "In a second terminal or pane, install the package into the scratch repo"
-say "and start a real session on it. A fresh project asks for trust first; grant it,"
-say "because nothing loads until it does:"
-step "cd \"$SCRATCH\" && pi install --local \"$REPO\""
-step "pi"
+stage "Start a session on this checkout and hand off the change"
+say "In a second terminal or pane, start a real session on the scratch repo. Three routes:"
+say ""
+step "1. this checkout alone, nothing else loaded:"
+note "     cd \"$SCRATCH\" && pi -ne -e \"$REPO/src/index.ts\""
+step "2. installed into the scratch repo, the way a user gets it:"
+note "     cd \"$SCRATCH\" && pi install --local \"$REPO\" && pi"
+step "3. every extension you have, this checkout instead of the install:"
+note "     cd \"$SCRATCH\" && pi -e \"$REPO/src/index.ts\""
+say ""
+say "Route 1 proves the row and nothing else. Routes 2 and 3 load your whole stack;"
+say "route 3 is the compatibility check, and the only one that puts pi-zentui and"
+say "pi-compact-transcript beside this change. Both need the installed copy gone"
+say "first, or the previous version answers too and splices a section back in:"
+step "pi remove git:github.com/jennymaeleidig/pi-copy-paste"
+ask SESSION_ROUTE "Which route did you take, 1, 2 or 3?" || true
+write_env SESSION_ROUTE "${SESSION_ROUTE:-unrecorded}"
+pause "Press Enter once the session is up"
 say "Then send the request in $STATE/prompt.txt (print it with: cat $STATE/prompt.txt):"
 note "    Rename the exported function greet to greeting in src/greeting.ts, and"
 note "    create src/index.ts that re-exports greeting with an explicit return type."
 note "    Hand both off with copy_paste. Do not edit the files yourself."
-say "The reply should end with a '## Hand-off' section holding two blocks:"
-step "one for src/greeting.ts, fenced diff, caption 'N hunk'"
-step "one for src/index.ts, fenced ts, caption 'new file, N lines'"
-step "each block sits under one copy_paste tool call above the reply"
+say "The reply should carry two hand-off rows and no hand-off section:"
+step "each row is one line: '✓ copy_paste', the caption (src/greeting.ts — N hunk), and a"
+step "  hint for expanding it, ctrl+o unless you rebound that key"
+step "the rows sit at the copy_paste calls, above the reply's own prose"
+step "the prose, and nothing else, follows them; there is no '## Hand-off' section"
 note "Leave pi running; the next stages use that session."
-pause "Press Enter once the blocks are in the reply"
-HANDOFF_OK=$(ask_yes_no "Were both blocks there, each from one copy_paste call?")
+pause "Press Enter once both rows are on screen"
+HANDOFF_OK=$(ask_yes_no "Were both rows there, one line each, with no hand-off section in the reply?")
 write_env HANDOFF_OK "$HANDOFF_OK"
 
 stage "Pick the diff with the picker"
@@ -384,7 +408,7 @@ say "In the pi session, on that same reply:"
 step "press Ctrl+Shift+C, or run /copy-paste"
 step "the overlay should open on the Hand-off tab, its items labelled by caption"
 step "choose the src/greeting.ts item and press enter"
-step "press 2 for the Agent reply tab, check it lists the reply's own blocks, then 1"
+step "press 2 for the Agent reply tab: it lists the reply's prose blocks only, then 1"
 step "watch for the 'Copied ...' notice"
 printf '' | clip_write 2>/dev/null ||
   warn "could not clear the clipboard; an older payload could still pass the check"
@@ -440,58 +464,63 @@ else
 fi
 write_env PATCH_APPLIES "$PATCH_APPLIES"
 
-stage "The whole-reply path"
+stage "Expand a row and read the block in place"
 say "Back in the pi session, on the same reply:"
+step "press ctrl+o (or your binding for 'toggle tool output'); every row expands at once"
+step "check the src/greeting.ts row now shows the caption, a diff fence and the hunks"
+step "check the diff reads the same as the payload the picker copied in the last stage"
+step "press ctrl+o again: the rows collapse back to one line each, and the reply is unmoved"
+pause "Press Enter once you have expanded and collapsed the rows"
+ROW_OK=$(ask_yes_no "Did both rows expand to the block and collapse back cleanly?")
+write_env ROW_OK "$ROW_OK"
+
+stage "The reply stays prose"
+say "The block is a row, not message text — the point of the change. This stage checks"
+say "that the reply's own copy carries none of it. Back in the pi session:"
 step "press Ctrl+X (or run /copy) with nothing selected in fullscreen mode"
-say "That copies the whole reply, fences and all. This stage checks that stripping the"
-say "outer fence gives back exactly the patch the picker copied."
+say "That copies the reply's prose. The check below asks only whether the block came"
+say "with it: a fenced example in the reply's own words is not a hand-off block."
 printf '' | clip_write 2>/dev/null ||
   warn "could not clear the clipboard; the reply check may read an older payload"
 pause "Press Enter once the reply has been copied"
 clip_into "$STATE/reply.txt"
 reply="$(cat "$STATE/reply.txt")"
-if [[ -n "$reply" ]]; then
-  show_prefix "$reply"
-fi
-# The first fenced block after the heading, with its own fence lines removed.
-awk '
-  /^## Hand-off/ { section = 1; next }
-  section && !opened && /^`{3,}/ { opened = 1; next }
-  section && opened && /^`{3,}/ { exit }
-  section && opened { print }
-' "$STATE/reply.txt" > "$STATE/stripped.diff"
 if [[ -z "$reply" ]]; then
-  WHOLE_REPLY_OK="unchecked: the clipboard read empty in this terminal"
+  PROSE_ONLY_OK="unchecked: the clipboard read empty in this terminal"
   warn "the clipboard read empty here, so the reply was never checked"
   say "Paste once to see whether the whole reply arrived; if it did, the clipboard is not"
   say "visible to this shell, and the copy itself is fine."
-elif [[ ! -s "$STATE/stripped.diff" ]]; then
-  WHOLE_REPLY_OK="no: no fenced block followed the Hand-off heading"
-  warn "the clipboard held no fenced block to strip"
 else
-  # Command substitution drops the empty line the block leaves before its closing
-  # fence and keeps one newline, which is the body byte for byte.
-  printf '%s\n' "$(cat "$STATE/stripped.diff")" > "$STATE/stripped.normalized"
-  if cmp -s "$STATE/stripped.normalized" "$STATE/picked.txt"; then
-    WHOLE_REPLY_OK=yes
-    note "✓ the stripped fence is the picker's payload, byte for byte"
+  show_prefix "$reply"
+  # What must be absent: the section heading the old splice wrote, and the block's
+  # own payload. A fence of the reply's own is fine — models write fenced examples,
+  # and this run's reply usually has one — so only the payload counts as evidence.
+  payload_head=$(head -n 1 "$STATE/picked.txt" 2>/dev/null || true)
+  if [[ "$reply" == *'## Hand-off'* ]]; then
+    PROSE_ONLY_OK="no: the reply still carries a hand-off heading"
+    warn "the reply has a '## Hand-off' heading"
+  elif [[ -n "$payload_head" && "$reply" == *"$payload_head"* ]]; then
+    PROSE_ONLY_OK="no: the reply carries the block's payload ($payload_head)"
+    warn "the reply reproduces the payload the picker copied"
   else
-    WHOLE_REPLY_OK="no: the stripped fence differs from what the picker copied"
-    warn "the stripped block is not the same text as the picked payload"
-    diff "$STATE/picked.txt" "$STATE/stripped.normalized" | head -n 6 | sed 's/^/        /'
+    PROSE_ONLY_OK=yes
+    if [[ "$reply" == *'```'* ]]; then
+      note "✓ no hand-off block; the fence in the reply is the reply's own prose"
+    else
+      note "✓ no hand-off block, heading or payload"
+    fi
   fi
 fi
-write_env WHOLE_REPLY_OK "$WHOLE_REPLY_OK"
-
-stage "Reflow"
-say "The splice replaces the reply's text at the end of the turn, so watch the screen"
-say "as the hand-off section appears: does the view jump, scroll, duplicate a block,"
-say "or redraw half a screen?"
-note "If you missed it, send another small change request and watch that turn."
-ask REFLOW "One line on what you saw:"
-REFLOW_ACCEPTABLE=$(ask_yes_no "Was the reflow acceptable?")
-write_env REFLOW "$REFLOW"
-write_env REFLOW_ACCEPTABLE "$REFLOW_ACCEPTABLE"
+write_env PROSE_ONLY_OK "$PROSE_ONLY_OK"
+say ""
+say "Watch the screen while you expand and collapse the rows:"
+note "does the transcript jump, scroll, duplicate a row, or repaint half a screen?"
+note "with pi-compact-transcript installed, a collapsed row stays one line: does the"
+note "expanded row still show the block, rather than that extension's summary?"
+ask ROW_MOTION "One line on what you saw:"
+ROW_MOTION_ACCEPTABLE=$(ask_yes_no "Was the row's motion acceptable?")
+write_env ROW_MOTION "$ROW_MOTION"
+write_env ROW_MOTION_ACCEPTABLE "$ROW_MOTION_ACCEPTABLE"
 
 stage "Record the run"
 say "Last thing, and nothing to type: the report goes to docs/verification/. Read it"
@@ -501,15 +530,17 @@ mkdir -p "$REPO/docs/verification"
 {
   printf '# Live verification: %s\n\n' "$(date +%Y-%m-%d)"
   printf 'A run of `scripts/verify-live.sh` against a scratch repository: the extension\n'
-  printf 'installed in a real session, a block picked from the reply, and the clipboard payload\n'
-  printf 'checked against git. Applying it is the applier\x27s business, and out of scope.\n\n'
+  printf 'installed in a real session, a block read in its row and picked from the picker,\n'
+  printf 'and the clipboard payload checked against git. Applying it is the applier\x27s\n'
+  printf 'business, and out of scope.\n\n'
   printf '| Criterion | Result |\n| --- | --- |\n'
-  printf '| One `copy_paste` call hands off a change | %s |\n' "$HANDOFF_OK"
+  printf '| One `copy_paste` call yields one row, and the reply gains no section | %s |\n' "$HANDOFF_OK"
   printf '| The picker copies the body alone, no fence and a trailing newline | %s |\n' "$PICKER_PAYLOAD_OK"
   printf '| git apply --check accepts the picked payload | %s |\n' "$PATCH_APPLIES"
-  printf '| The whole-reply path strips to the same patch | %s |\n' "$WHOLE_REPLY_OK"
-  printf '| Reflow acceptable | %s |\n\n' "$REFLOW_ACCEPTABLE"
-  printf '## Reflow\n\n%s\n\n' "$REFLOW"
+  printf '| The row expands to the block and collapses back | %s |\n' "$ROW_OK"
+  printf '| The reply\x27s own copy carries no hand-off block | %s |\n' "$PROSE_ONLY_OK"
+  printf '| Row motion acceptable | %s |\n\n' "$ROW_MOTION_ACCEPTABLE"
+  printf '## The row\x27s motion\n\n%s\n\n' "$ROW_MOTION"
   printf '## What the contract must change\n\nThis report is the record: read it against\n'
   printf '`docs/handoff-contract.md` and fix the contract where the run contradicted it.\n'
   printf 'Nothing in the table above is gated on that reading.\n\n'
@@ -518,16 +549,20 @@ mkdir -p "$REPO/docs/verification"
   printf -- '- node: %s\n' "$NODE_VERSION"
   printf -- '- scratch repository: `%s`\n' "$SCRATCH"
   printf -- '- clipboard readable from the shell: %s\n' "$CLIPBOARD_OK"
+  printf -- '- pi-copy-paste also installed as a package (excluded from the run): %s\n' \
+    "$PI_COPY_PASTE_INSTALLED"
+  printf -- '- session route: %s (1 = checkout with -ne, 2 = installed, 3 = checkout plus your stack)\n' \
+    "${SESSION_ROUTE:-unrecorded}"
 } > "$REPORT"
 note "✓ wrote $REPORT"
 SKIPPED+=("read $REPORT (gitignored, so it is not committed)")
 finish
 printf '  %sReport: %s%s\n\n' "$GREEN" "$REPORT" "$RESET"
 if [[ "$HANDOFF_OK" == yes && "$PICKER_PAYLOAD_OK" == yes &&
-  "$PATCH_APPLIES" == yes && "$WHOLE_REPLY_OK" == yes ]]; then
+  "$PATCH_APPLIES" == yes && "$ROW_OK" == yes && "$PROSE_ONLY_OK" == yes ]]; then
   printf '  %s✓ every criterion passed%s\n\n' "$GREEN" "$RESET"
 elif [[ "$PICKER_PAYLOAD_OK" == unchecked* || "$PATCH_APPLIES" == unchecked* ||
-  "$WHOLE_REPLY_OK" == unchecked* ]]; then
+  "$PROSE_ONLY_OK" == unchecked* ]]; then
   printf '  %s⚠ the payload could not be checked: this shell cannot see the clipboard%s\n\n' \
     "$YELLOW" "$RESET"
   exit 2

@@ -13,11 +13,12 @@ test("the counts include a content line that starts like a file header", () => {
 test("registers copy_paste and a message_end handler", () => {
   const harness = loadExtension("/tmp");
   assert.equal(harness.tool.name, "copy_paste");
-  assert.match(harness.tool.description, /do not write it yourself/i);
+  assert.match(harness.tool.description, /draw a copyable hand-off block in this tool's row/i);
+  assert.match(harness.tool.description, /do not repeat it/i);
   assert.ok(harness.tool.promptGuidelines?.some((rule) => rule.includes("copy_paste")));
 });
 
-test("code+diff emits a counted, validated diff and the splice carries it", async () => {
+test("code+diff emits a counted, validated diff and the row carries it", async () => {
   const repo = await makeRepo({ "src/example.ts": "one\ntwo\nthree\n" });
   try {
     const harness = loadExtension(repo);
@@ -36,15 +37,15 @@ test("code+diff emits a counted, validated diff and the splice carries it", asyn
       "the tool never writes the target",
     );
 
-    const section = await harness.appendHandoff();
+    const drawn = harness.drawnBlock();
     assert.equal(
-      section,
-      "\n\n\n---\n\n## Hand-off — 1 block\n\n`src/example.ts` — 1 hunk\n\n" +
-        "```diff\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n\n```\n",
+      drawn,
+      "`src/example.ts` — 1 hunk\n\n" +
+        "```diff\n--- a/src/example.ts\n+++ b/src/example.ts\n@@ -1,3 +1,3 @@\n one\n-two\n+TWO\n three\n\n```",
     );
     assert.ok(
-      blockBody(section!).endsWith("\n"),
-      "the whole-reply section must keep the patch's trailing newline",
+      blockBody(drawn!).endsWith("\n"),
+      "the expanded row must keep the patch's trailing newline",
     );
   } finally {
     await remove(repo);
@@ -61,8 +62,8 @@ test("the emitted diff applies to a clean checkout", async () => {
       replacements: [{ search: "beta\ngamma", replace: "BETA\nGAMMA" }],
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    const patch = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const patch = blockBody(drawn!);
 
     await git(repo, "checkout", "--", ".");
     await writeFile(join(repo, "emitted.patch"), patch, "utf8");
@@ -89,8 +90,8 @@ test("code+full creates a new file block without writing it", async () => {
     assert.equal(result.isError, undefined);
     assert.match(result.content[0]!.text, /new file, 2 lines/);
 
-    const section = await harness.appendHandoff();
-    assert.match(section!, /`new\.txt` — new file, 2 lines\n\n```\nhello\nworld\n\n```/);
+    const drawn = harness.drawnBlock();
+    assert.match(drawn!, /`new\.txt` — new file, 2 lines\n\n```\nhello\nworld\n\n```/);
     await assert.rejects(readFile(join(repo, "new.txt"), "utf8"), /ENOENT/);
   } finally {
     await remove(repo);
@@ -108,9 +109,9 @@ test("code+full rewrites an existing file and tags its language", async () => {
       content: "new\n",
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    assert.match(section!, /`src\/a\.ts` — full file, 1 line/);
-    assert.match(section!, /```ts\nnew\n\n```/);
+    const drawn = harness.drawnBlock();
+    assert.match(drawn!, /`src\/a\.ts` — full file, 1 line/);
+    assert.match(drawn!, /```ts\nnew\n\n```/);
   } finally {
     await remove(repo);
   }
@@ -127,8 +128,8 @@ test("command blocks are syntax-checked and captioned by purpose", async () => {
     });
     assert.equal(result.isError, undefined);
     assert.match(result.content[0]!.text, /bash -n passed/);
-    const section = await harness.appendHandoff();
-    assert.match(section!, /`say hi` — command\n\n```bash\necho hi\n\n```/);
+    const drawn = harness.drawnBlock();
+    assert.match(drawn!, /`say hi` — command\n\n```bash\necho hi\n\n```/);
   } finally {
     await remove(repo);
   }
@@ -163,8 +164,8 @@ test("fence length grows past backticks in a full block", async () => {
       content,
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    assert.match(section!, /\n````md\nbefore\n```\ninside\n```\nafter\n\n````\n$/);
+    const drawn = harness.drawnBlock();
+    assert.match(drawn!, /\n````md\nbefore\n```\ninside\n```\nafter\n\n````$/);
   } finally {
     await remove(repo);
   }
@@ -185,7 +186,7 @@ test("zero-match replacements name the nearest lines", async () => {
     assert.match(result.content[0]!.text, /did not match anything/);
     assert.match(result.content[0]!.text, /Nearest lines:/);
     assert.match(result.content[0]!.text, /2: const beta = 2;/);
-    assert.equal(await harness.appendHandoff(), undefined);
+    assert.equal(harness.drawnBlock(), undefined);
   } finally {
     await remove(repo);
   }
@@ -263,7 +264,7 @@ test("a second call for the same path in one reply is refused", async () => {
   }
 });
 
-test("several blocks are spliced in tool-call order", async () => {
+test("each call owns its own row, and the blocks keep call order", async () => {
   const repo = await makeRepo({ "a.ts": "a\n", "b.ts": "b\n" });
   try {
     const harness = loadExtension(repo);
@@ -284,11 +285,15 @@ test("several blocks are spliced in tool-call order", async () => {
       replacements: [{ search: "b", replace: "B" }],
     });
 
-    const section = await harness.appendHandoff();
-    const b = section!.indexOf("`b.ts`");
-    const a = section!.indexOf("`a.ts`");
-    const cmd = section!.indexOf("`third`");
-    assert.ok(b > 0 && a > b && cmd > a, `unexpected order:\n${section}`);
+    // Each result carries its own block, and the message lists the calls in the
+    // order the reply made them; the picker sorts by that list, not by execution.
+    const ordered = ["a.ts", "b.ts", "third"].map((name) =>
+      harness.blocks.find((block) => block.caption.includes(name))!,
+    );
+    assert.deepEqual(
+      ordered.map((block) => block.toolCallId),
+      ["call-a", "call-b", "call-cmd"],
+    );
   } finally {
     await remove(repo);
   }
@@ -314,11 +319,12 @@ test("messages that are not assistant content do not throw", async () => {
   }
 });
 
-test("a turn with no blocks gets no hand-off section", async () => {
+test("a turn with no blocks leaves the message alone", async () => {
   const repo = await makeRepo();
   try {
     const harness = loadExtension(repo);
-    assert.equal(await harness.appendHandoff("just prose"), undefined);
+    assert.equal(harness.drawnBlock(), undefined);
+    assert.equal(await harness.emit(harness.finalMessage("just prose")), undefined);
   } finally {
     await remove(repo);
   }
@@ -334,8 +340,8 @@ test("an escape-hatch patch is recounted and canonicalised", async () => {
       patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1,99 +1,99 @@\n one\n-two\n+TWO\n three\n",
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    const body = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const body = blockBody(drawn!);
     assert.match(body, /@@ -1,3 \+1,3 @@/);
     assert.doesNotMatch(body, /99/);
 
@@ -356,8 +362,8 @@ test("an escape-hatch /dev/null patch creates a new file", async () => {
       patch: "--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1,2 @@\n+hello\n+world\n",
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    const body = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const body = blockBody(drawn!);
     assert.match(body, /@@ -0,0 \+1,2 @@/);
 
     await writeFile(join(repo, "emitted.patch"), body, "utf8");
@@ -444,8 +450,8 @@ test("a file without a trailing newline keeps that fact in the diff", async () =
       replacements: [{ search: "two", replace: "TWO" }],
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    const patch = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const patch = blockBody(drawn!);
     assert.match(patch, /\\ No newline at end of file/);
 
     await writeFile(join(repo, "emitted.patch"), patch, "utf8");
@@ -466,8 +472,8 @@ test("a patch line whose content starts with +++ is not read as a header", async
       patch: "--- a/src/a.ts\n+++ b/src/a.ts\n@@ -1 +1,2 @@\n one\n+++ foo\n",
     });
     assert.equal(result.isError, undefined);
-    const section = await harness.appendHandoff();
-    const patch = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const patch = blockBody(drawn!);
     await writeFile(join(repo, "emitted.patch"), patch, "utf8");
     await git(repo, "apply", "-p1", "emitted.patch");
     assert.equal(await readFile(join(repo, "src/a.ts"), "utf8"), "one\n++ foo\n");
@@ -492,8 +498,8 @@ test("two separated edits produce two hunks that still apply", async () => {
     assert.equal(result.isError, undefined);
     assert.match(result.content[0]!.text, /2 hunks/);
 
-    const section = await harness.appendHandoff();
-    const patch = blockBody(section!);
+    const drawn = harness.drawnBlock();
+    const patch = blockBody(drawn!);
     await writeFile(join(repo, "emitted.patch"), patch, "utf8");
     await git(repo, "apply", "-p1", "emitted.patch");
     assert.equal(

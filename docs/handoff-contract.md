@@ -31,14 +31,13 @@ so a full-file block that contains fences of its own cannot terminate early. The
 computed from the content rather than written by hand. A non-empty block leaves one empty
 line before the closing fence, because a fenced body cannot otherwise carry a final newline:
 a reader that strips the fences gets the body's trailing newline back, and a patch that lost
-one is `corrupt patch` to git. That blank line serves the whole-reply path; the picker's
-hand-off tab copies the body from memory and never reads the fences, and the Agent reply tab
-reads the blank line back as the body's final newline when it strips a code fence.
+one is `corrupt patch` to git. That blank line serves the expanded row, where the fence is
+drawn as Markdown; the picker's hand-off tab copies the body from the block itself and never
+reads the fences.
 
-The section itself opens with a horizontal rule above its heading, so it reads as separate
-from the reply's prose. The rule is part of the reply and never part of a block: stripping a
-block's fences leaves it above them. The heading names the count — `## Hand-off — 3 blocks` —
-because the picker's tabs cannot be seen from the transcript.
+The block is drawn in the row of the call that produced it: one line while collapsed, the
+caption and its fence when expanded. It is never part of the reply's prose, so nothing about
+the heading a section would need — its count, its rule — exists here.
 
 ## Two copy paths
 
@@ -49,12 +48,12 @@ because the picker's tabs cannot be seen from the transcript.
   no more than the message contains. It does read fences by tag, though — a code fence copies as
   its code, the fences decoration around it, while an `md` fence is a document whose own fences
   are part of it and copies whole.
-- **Whole-reply path** (`/copy`, `Ctrl+X`): the fences come along, so strip one leading fence
-  together with the tag that follows it, and the trailing run, which is at least as long as
-  the leading one.
+- **Row path** (`ctrl+o`, or a left click): the expanded row draws the block for a human to read
+  — Markdown on a screen, so its lines are wrapped and indented, and a selection is reading
+  material rather than bytes. The picker is the copy path; the row is the reading path.
 
 Only a `diff` block is an applier's input. A `full` block is for saving over the target: on
-the picker path its payload is file content, and on the whole-reply path its tag names a
+the picker path its payload is file content, and in its row its tag names a
 language rather than a kind. No block body distinguishes the kinds, so the human chooses
 which block to paste, and the caption above it says what it is.
 

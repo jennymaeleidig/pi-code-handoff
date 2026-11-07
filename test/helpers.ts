@@ -4,7 +4,50 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import type { ExtensionAPI, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { type HandoffBlock, renderBlock } from "../src/handoff.ts";
+import type { SessionEntryLike } from "../src/session.ts";
 import extension from "../src/index.ts";
+
+/** A block fixture; a test overrides the one field it cares about. */
+export function fixtureBlock(overrides: Partial<HandoffBlock> = {}): HandoffBlock {
+  return {
+    toolCallId: "call-1",
+    kind: "code",
+    form: "diff",
+    path: "greet.py",
+    body: "--- a/greet.py\n+++ b/greet.py\n@@ -1 +1 @@\n-old\n+new\n",
+    lang: "diff",
+    caption: "`greet.py` — 1 hunk",
+    ...overrides,
+  };
+}
+
+/** An assistant entry, with the `copy_paste` calls it made. */
+export function assistantEntry(text: string, calls: string[] = []): SessionEntryLike {
+  return {
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [
+        ...(text === "" ? [] : [{ type: "text", text }]),
+        ...calls.map((id) => ({ type: "toolCall", id, name: "copy_paste" })),
+      ],
+    },
+  };
+}
+
+/** A tool result entry carrying a block, the way `copy_paste` stores one. */
+export function toolResultEntry(toolCallId: string, block: unknown): SessionEntryLike {
+  return {
+    type: "message",
+    message: { role: "toolResult", toolCallId, details: { block } },
+  };
+}
+
+/** A user entry: what opens a turn. */
+export function userEntry(text = "hi"): SessionEntryLike {
+  return { type: "message", message: { role: "user", content: [{ type: "text", text }] } };
+}
 
 const exec = promisify(execFile);
 
@@ -69,7 +112,9 @@ export interface Harness {
   directory: string;
   tool: ToolDefinition;
   toolCalls: string[];
-  /** Custom entries the extension appended with `pi.appendEntry`. */
+  /** Every block the tool produced, in call order, as `details` carried it. */
+  blocks: HandoffBlock[];
+  /** Custom entries the extension appended — it must append none. */
   entries: Array<{ type: "custom"; customType: string; data?: unknown }>;
   commands: Map<string, CommandOptions>;
   shortcuts: Map<string, ShortcutOptions>;
@@ -81,8 +126,8 @@ export interface Harness {
   emit(message: unknown): Promise<{ message?: unknown } | undefined>;
   toolCallMessage(ids: string[]): unknown;
   finalMessage(text?: string): unknown;
-  /** The appended hand-off section, or undefined when none was spliced. */
-  appendHandoff(text?: string): Promise<string | undefined>;
+  /** The last block as an expanded row draws it, fence and caption included. */
+  drawnBlock(): string | undefined;
   /** Run a registered command or shortcut against a stand-in context. */
   runCommand(name: string, options?: FakeContextOptions): Promise<CommandResult>;
   runShortcut(key: string, options?: FakeContextOptions): Promise<CommandResult>;
@@ -156,6 +201,7 @@ export function loadExtension(directory: string): Harness {
   const commands = new Map<string, CommandOptions>();
   const shortcuts = new Map<string, ShortcutOptions>();
   const entries: Array<{ type: "custom"; customType: string; data?: unknown }> = [];
+  const blocks: HandoffBlock[] = [];
   let counter = 0;
   const toolCalls: string[] = [];
 
@@ -173,6 +219,8 @@ export function loadExtension(directory: string): Harness {
       shortcuts.set(key, options);
     },
     appendEntry(customType: string, data?: unknown) {
+      // Recorded so a test can assert nothing is ever appended: the block rides
+      // on the tool result's details, and a side channel would be a regression.
       entries.push({ type: "custom", customType, data });
     },
   } as unknown as ExtensionAPI;
@@ -204,20 +252,23 @@ export function loadExtension(directory: string): Harness {
   const execute = async (id: string, params: Record<string, unknown>, cwd = directory) => {
     toolCalls.push(id);
     await emit(toolCallMessage([id]));
-    return (await tool!.execute(id, params as never, undefined, undefined, {
+    const result = (await tool!.execute(id, params as never, undefined, undefined, {
       cwd,
     } as never)) as unknown as {
       content: Array<{ text: string }>;
+      details?: { block?: HandoffBlock };
       isError?: boolean;
     };
+    const block = result.details?.block;
+    if (block !== undefined) blocks.push(block);
+    return result;
   };
 
-  const appendHandoff = async (text = "Done.") => {
-    const result = await emit(finalMessage(text));
-    if (!result?.message) return undefined;
-    const content = (result.message as { content: Array<{ type: string; text: string }> }).content;
-    const last = content[content.length - 1];
-    return last?.type === "text" ? last.text : undefined;
+  // The expanded row is the only place a block is drawn now, so this is what a
+  // test reads when it wants the text a human would see.
+  const drawnBlock = () => {
+    const last = blocks[blocks.length - 1];
+    return last === undefined ? undefined : renderBlock(last);
   };
 
   const runHandler = async (
@@ -248,6 +299,7 @@ export function loadExtension(directory: string): Harness {
     directory,
     tool,
     toolCalls,
+    blocks,
     entries,
     commands,
     shortcuts,
@@ -255,24 +307,24 @@ export function loadExtension(directory: string): Harness {
     emit,
     toolCallMessage,
     finalMessage,
-    appendHandoff,
+    drawnBlock,
     runCommand,
     runShortcut,
   };
 }
 
 /**
- * Extract a block body between its fences, as the whole-reply path's applier
- * does. `renderBlock` leaves one empty line before the closing fence because a
- * fenced body cannot otherwise carry a final newline: line-joining keeps that
- * last empty line, so the result ends in the body's trailing newline.
+ * Extract a block body between its fences, as an applier does. `renderBlock`
+ * leaves one empty line before the closing fence because a fenced body cannot
+ * otherwise carry a final newline: line-joining keeps that last empty line, so
+ * the result ends in the body's trailing newline.
  */
-export function blockBody(section: string): string {
-  const lines = section.split("\n");
+export function blockBody(drawn: string): string {
+  const lines = drawn.split("\n");
   const start = lines.findIndex((line) => /^`{3,}/.test(line));
-  if (start < 0) throw new Error(`no fenced block in:\n${section}`);
+  if (start < 0) throw new Error(`no fenced block in:\n${drawn}`);
   const fence = /^(`{3,})/.exec(lines[start]!)?.[1]!;
   const end = lines.findIndex((line, index) => index > start && line.startsWith(fence));
-  if (end < 0) throw new Error(`unterminated fenced block in:\n${section}`);
+  if (end < 0) throw new Error(`unterminated fenced block in:\n${drawn}`);
   return lines.slice(start + 1, end).join("\n");
 }

@@ -50,9 +50,9 @@ function keepsFences(lang: string): boolean {
 /**
  * A code fence's body, with the final newline a fenced body cannot carry put
  * back. A hand-off block's fence leaves an empty line before the closer for
- * exactly this reason, so a block this extension spliced arrives here already
- * terminated and unchanged; a patch that lost its last newline is `corrupt
- * patch` to git.
+ * exactly this reason, so a block this extension draws in its row arrives here
+ * already terminated and unchanged; a patch that lost its last newline is
+ * `corrupt patch` to git.
  */
 function codeBody(body: string): string {
   return body === "" || body.endsWith("\n") ? body : `${body}\n`;

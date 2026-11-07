@@ -1,19 +1,25 @@
 # pi-copy-paste
 
 Turns a proposed change into a validated, copyable artifact — a hand-off block — and puts it
-in the assistant's reply, where a picker can reach it and an applier can consume it. The
-extension never writes to the target repository.
+in a row of its own under the reply, where a picker can reach it and an applier can consume it.
+The extension never writes to the target repository.
 
 ## Language
 
 **Hand-off block**:
-One fenced artifact in an assistant reply that a human copies out and applies outside pi.
+One fenced artifact, drawn in the tool row of the `copy_paste` call that produced it, that a
+human copies out and applies outside pi.
 _Avoid_: Snippet, patch output, copy block
 
-**Hand-off section**:
-The rule, the heading, and every block placed in one assistant message, in tool-call order.
-Absent when a turn produced no blocks.
-_Avoid_: Footer, appendix, block dump
+**Hand-off row**:
+The tool row that draws one block: a single line while collapsed, the block itself when
+expanded. The block's only presentation, and never message text.
+_Avoid_: Section, footer, appendix, block dump
+
+**Expanded**:
+Whether a hand-off row is showing its block. Pi's `ctrl+o` toggles every row at once, and a left
+click toggles one.
+_Avoid_: Open, unfolded, shown
 
 **Caption**:
 The one line immediately above a block's fence, naming the path the block touches or the
@@ -21,14 +27,14 @@ purpose of the command it carries. Every block has its own.
 _Avoid_: Title, label, header
 
 **Splice**:
-Placing a hand-off block into the assistant message itself, so the bytes validated and the
-bytes picked are one object.
+What this package used to do: place a hand-off block into the assistant message itself. Retired
+— see `docs/adr/0003-the-hand-off-lives-in-its-own-row.md`; a block is a row now.
 _Avoid_: Append, inject, patch message
 
-**Reflow**:
-What the screen does when the spliced hand-off section replaces the message at the end of a
-turn — a jump, a scroll, a repaint — and whether it is acceptable.
-_Avoid_: Repaint, flicker, re-render
+**Turn**:
+What a user message opens and the next one closes. A tool-using turn has several assistant
+messages, so the turn — not the last message — is the unit the picker reads blocks from.
+_Avoid_: Reply, exchange, round
 
 **Kind**:
 What a block carries: code or command.

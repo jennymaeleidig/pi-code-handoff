@@ -6,32 +6,27 @@ import type {
   ExtensionContext,
   ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { copyToClipboard } from "@earendil-works/pi-coding-agent";
+import { copyToClipboard, getMarkdownTheme } from "@earendil-works/pi-coding-agent";
+import { Container, Markdown, Text } from "@earendil-works/pi-tui";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { type Static, Type } from "typebox";
 import { countDiff, splitText, unifiedDiff } from "./diff.ts";
 import { checkCommand, checkPatch, repositoryRoot } from "./git.ts";
 import {
-  SPLICED_NOTE,
+  ROW_NOTE,
   commandCaption,
   diffCaption,
   fullCaption,
   languageFor,
   plural,
-  renderSection,
+  renderBlock,
   type HandoffBlock,
 } from "./handoff.ts";
 import { applyReplacements, type Replacement } from "./replace.ts";
 import { applyHunks, parsePatch } from "./patch.ts";
 import { payload, pickerFor, type PickerItem } from "./picker.ts";
 import { createPickerView } from "./picker-view.ts";
-import {
-  HANDOFF_ENTRY,
-  handoffEntry,
-  type HandoffMemory,
-  messageTimestamp,
-  type SessionEntryLike,
-} from "./session.ts";
+import { handoffBlockOf, type SessionEntryLike } from "./session.ts";
 
 const schema = Type.Object({
   kind: StringEnum(["code", "command"] as const),
@@ -120,7 +115,7 @@ async function buildBlock(
         lang: "bash",
         caption: commandCaption(purpose),
       },
-      verdict: `Validated command "${purpose}": bash -n passed. ${SPLICED_NOTE}`,
+      verdict: `Validated command "${purpose}": bash -n passed.`,
     };
   }
 
@@ -198,9 +193,7 @@ async function buildCodeBlock(
         lang: languageFor(path),
         caption: fullCaption(path, !exists, lines),
       },
-      verdict:
-        `Validated ${path}: ${exists ? "full file" : "new file"}, ${plural(lines, "line")}. ` +
-        SPLICED_NOTE,
+      verdict: `Validated ${path}: ${exists ? "full file" : "new file"}, ${plural(lines, "line")}.`,
     };
   }
 
@@ -298,25 +291,39 @@ async function diffResult(
     },
     verdict:
       `Validated ${path}: ${plural(counts.hunks, "hunk")}, ` +
-      `${plural(counts.insertions, "insertion")}, ${plural(counts.deletions, "deletion")}. ` +
-      `git apply --check passed. ${SPLICED_NOTE}`,
+      `${plural(counts.insertions, "insertion")}, ${plural(counts.deletions, "deletion")}; ` +
+      `git apply --check passed.`,
   };
 }
 
+/** A row's fallback words: the result's own text, when there is no block to draw. */
+function resultText(content: readonly unknown[]): string {
+  return content
+    .map((part) => {
+      if (typeof part !== "object" || part === null) return "";
+      const piece = part as { type?: unknown; text?: unknown };
+      return piece.type === "text" && typeof piece.text === "string" ? piece.text : "";
+    })
+    .filter((text) => text !== "")
+    .join(" ");
+}
+
+/** A caption without the backticks it carries for the Markdown form. */
+function plainCaption(caption: string): string {
+  return caption.replace(/`/g, "");
+}
+
 /**
- * The picker for the last reply: `replyBlocks` picks the blocks, `pickerFor`
+ * The picker for the last turn: `turnBlocks` picks the blocks, `pickerFor`
  * picks the tab. A reply with no blocks still opens, so the notice can say so.
  */
-async function openCopyPicker(
-  ctx: ExtensionContext,
-  memory: HandoffMemory | undefined,
-): Promise<void> {
+async function openCopyPicker(ctx: ExtensionContext): Promise<void> {
   if (ctx.mode !== "tui") {
     ctx.ui.notify("The copy picker needs interactive mode.", "error");
     return;
   }
 
-  const source = pickerFor(ctx.sessionManager.getBranch() as readonly SessionEntryLike[], memory);
+  const source = pickerFor(ctx.sessionManager.getBranch() as readonly SessionEntryLike[]);
   if (source === undefined) {
     ctx.ui.notify("No assistant reply to pick a block from.", "warning");
     return;
@@ -343,88 +350,35 @@ async function openCopyPicker(
 }
 
 /**
- * A validated hand-off block tool. Blocks live only in memory until the
- * assistant message ends; the extension then splices them into that message,
- * so the text a human copies is exactly the text git accepted.
+ * A validated hand-off block tool. A block is drawn in the row of the call that
+ * produced it — one line until the row is expanded — and lives on as that tool
+ * result's `details`, which is what the picker copies. The assistant message is
+ * left alone: prose is prose, and a block is a row.
  */
 export default function piCopyPaste(pi: ExtensionAPI): void {
-  let pending: HandoffBlock[] = [];
-  let callOrder: string[] = [];
   let claimedPaths = new Set<string>();
-  /** The last reply's blocks, kept for the picker across the turn. */
-  let lastHandoff: HandoffMemory | undefined;
 
   pi.on("session_start", async () => {
-    pending = [];
-    callOrder = [];
     claimedPaths = new Set();
-    lastHandoff = undefined;
   });
 
+  // One block per path per reply: a second block for a file the first block is
+  // about to change would be a guess, so the claim lasts until the human speaks.
   pi.on("message_end", async (event) => {
-    const message = event.message;
-
-    if (message.role === "user") {
-      pending = [];
-      callOrder = [];
-      claimedPaths = new Set();
-      return;
-    }
-    if (message.role !== "assistant" || !Array.isArray(message.content)) return;
-
-    for (const block of message.content) {
-      if (
-        block.type === "toolCall" &&
-        block.name === "copy_paste" &&
-        !callOrder.includes(block.id)
-      ) {
-        callOrder.push(block.id);
-      }
-    }
-
-    if (pending.length === 0) return;
-    if (message.content.some((block) => block.type === "toolCall")) return;
-
-    const ordered = pending
-      .map((block, index) => ({ block, index }))
-      .sort((a, b) => {
-        const aOrder = callOrder.indexOf(a.block.toolCallId);
-        const bOrder = callOrder.indexOf(b.block.toolCallId);
-        const aKey = aOrder < 0 ? Number.MAX_SAFE_INTEGER : aOrder;
-        const bKey = bOrder < 0 ? Number.MAX_SAFE_INTEGER : bOrder;
-        return aKey - bKey || a.index - b.index;
-      })
-      .map((entry) => entry.block);
-
-    const text = renderSection(ordered);
-    const timestamp = messageTimestamp(message.timestamp);
-    // Persist the list with the message it belongs to, so the picker can
-    // rebuild the hand-off tab after /reload or a session resume.
-    lastHandoff = { messageTimestamp: timestamp, blocks: ordered };
-    pi.appendEntry(HANDOFF_ENTRY, handoffEntry(timestamp, ordered));
-    pending = [];
-    callOrder = [];
-    claimedPaths = new Set();
-
-    return {
-      message: {
-        ...message,
-        content: [...message.content, { type: "text", text }],
-      },
-    };
+    if (event.message.role === "user") claimedPaths = new Set();
   });
 
   pi.registerCommand("copy-paste", {
-    description: "Pick a block from the last reply and copy it",
+    description: "Pick a block from the last turn and copy it",
     handler: async (_args, ctx) => {
-      await openCopyPicker(ctx, lastHandoff);
+      await openCopyPicker(ctx);
     },
   });
 
   pi.registerShortcut("ctrl+shift+c", {
-    description: "Pick a block from the last reply and copy it",
+    description: "Pick a block from the last turn and copy it",
     handler: async (ctx) => {
-      await openCopyPicker(ctx, lastHandoff);
+      await openCopyPicker(ctx);
     },
   });
 
@@ -432,8 +386,8 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     name: "copy_paste",
     label: "Copy Paste",
     description:
-      "Validate a change, then append a copyable hand-off block to your reply. " +
-      `${SPLICED_NOTE} ` +
+      "Validate a change, then draw a copyable hand-off block in this tool's row. " +
+      `${ROW_NOTE} ` +
       'For kind "code", pass a repo-relative or absolute path and exactly one of: "replacements" ' +
       '(search/replace pairs, each matching the file exactly once), "content" (the whole file; form "full" ' +
       'emits it entire, form "diff" diffs it against the file on disk), ' +
@@ -442,8 +396,11 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
       'For kind "command", pass "command" and a one-line "purpose"; the command is checked with bash -n. ' +
       "The target must be inside a git repository. On failure the applier's own error comes back so you can repair in this turn. " +
       "One block per path per reply.",
-    promptSnippet: "Validate a change and append a copyable hand-off block",
-    promptGuidelines: [`Use copy_paste to hand off code or shell commands. ${SPLICED_NOTE}`],
+    promptSnippet: "Validate a change and draw a copyable hand-off block in the tool's row",
+    promptGuidelines: [
+      `Use copy_paste to hand off code or shell commands. ${ROW_NOTE} The human copies the block ` +
+        "with the picker (ctrl+shift+c) or by expanding the row.",
+    ],
     parameters: schema,
     async execute(
       toolCallId: string,
@@ -454,10 +411,9 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
     ) {
       try {
         const result = await buildBlock(toolCallId, params, ctx.cwd, claimedPaths);
-        pending.push(result.block);
         return {
           content: [{ type: "text" as const, text: result.verdict }],
-          details: { path: result.block.path ?? "", form: result.block.form ?? "command" },
+          details: { block: result.block },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -467,6 +423,41 @@ export default function piCopyPaste(pi: ExtensionAPI): void {
           isError: true,
         };
       }
+    },
+    renderCall() {
+      // Empty on purpose: pi draws the call and the result as two stacked
+      // regions, so a title here would make every block two lines. The one line
+      // is drawn by renderResult, which is the slot that knows what happened.
+      // Compose and Container render no lines, and Box adds no padding for it.
+      return new Container();
+    },
+    renderResult(result, { expanded, isPartial }, theme, context) {
+      const block = handoffBlockOf(result.details?.block);
+      const name = theme.fg("toolTitle", theme.bold("copy_paste"));
+      if (isPartial || block === undefined) {
+        // A refusal, or a stream that has not produced a block yet: the row says
+        // what the result says, and pi's own error colouring carries the rest.
+        const colour = context.isError ? "error" : "dim";
+        return new Text(`${name} ${theme.fg(colour, resultText(result.content))}`, 0, 0);
+      }
+      if (expanded) {
+        // Expanded, the row reads like any other tool's: its name, then the
+        // block. The caption stays in the block rather than repeating it above.
+        const row = new Container();
+        row.addChild(new Text(theme.fg("success", "✓ ") + name, 0, 0));
+        row.addChild(new Markdown(renderBlock(block), 0, 0, getMarkdownTheme()));
+        return row;
+      }
+      const hint = context.keyHint("app.tools.expand", "to show the block");
+      return new Text(
+        theme.fg("success", "✓ ") +
+          name +
+          " " +
+          plainCaption(block.caption) +
+          theme.fg("dim", `  ${hint}`),
+        0,
+        0,
+      );
     },
   });
 }

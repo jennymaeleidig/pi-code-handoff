@@ -9,7 +9,7 @@
 
 import { blockBadge, type HandoffBlock, plural } from "./handoff.ts";
 import { parseMarkdownBlocks } from "./markdown.ts";
-import { type HandoffMemory, lastReply, replyBlocks, type SessionEntryLike } from "./session.ts";
+import { lastTurn, turnBlocks, type SessionEntryLike } from "./session.ts";
 
 export type PickerTab = "handoff" | "parsed";
 
@@ -66,14 +66,11 @@ export function pickerSource(blocks: readonly HandoffBlock[], text: string): Pic
   return { handoff: handoffItems(blocks), parsed: parsedItems(text) };
 }
 
-/** The picker for the last reply on the branch, or undefined without one. */
-export function pickerFor(
-  branch: readonly SessionEntryLike[],
-  memory: HandoffMemory | undefined,
-): PickerSource | undefined {
-  const reply = lastReply(branch);
+/** The picker for the last turn on the branch, or undefined without one. */
+export function pickerFor(branch: readonly SessionEntryLike[]): PickerSource | undefined {
+  const reply = lastTurn(branch);
   if (reply === undefined) return undefined;
-  return pickerSource(replyBlocks(branch, reply, memory), reply.text);
+  return pickerSource(turnBlocks(branch, reply), reply.text);
 }
 
 /** The Agent reply tab's blocks; the whole-reply item is a copy, not one of them. */

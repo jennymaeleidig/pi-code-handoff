@@ -1,29 +1,24 @@
 # pi-copy-paste
 
 Turns a proposed change into a validated, copyable artifact — a **hand-off block** — and puts
-it in the assistant's reply, where a picker can reach it and an applier outside pi can consume
-it. The extension never writes to the target repository and never applies anything.
+it in a row of its own under the reply, where a picker can reach it and an applier outside pi
+can consume it. The extension never writes to the target repository and never applies anything.
 
 ````text
 you:    Move parseKey into src/keys.ts and hand it off.
 
-pi:     Validated src/index.ts: 2 hunks, 3 insertions, 4 deletions. git apply --check passed.
-        Validated src/keys.ts: new file, 18 lines.
+pi:     ✓ copy_paste src/index.ts — 2 hunks        ctrl+o to show the block
+        ✓ copy_paste src/keys.ts — new file, 18 lines   ctrl+o to show the block
 
+        Both files are ready. `parseKey` moved without changing what it parses.
 
-        ---
-
-        ## Hand-off — 2 blocks
+        — expanded by ctrl+o —
 
         `src/index.ts` — 2 hunks
 
+        ```diff
         --- a/src/index.ts
         +++ b/src/index.ts
-        ...
-
-        `src/keys.ts` — new file, 18 lines
-
-        ```ts
         ...
         ```
 ````
@@ -63,7 +58,7 @@ The extension registers one tool, `copy_paste`, and the assistant calls it. You 
 
 > Add a `--strict` flag to `src/git.ts`, then hand me the command to try it.
 
-The tool validates before it emits, so a block in the reply is a block that already passed:
+The tool validates before it emits, so a block in a row is a block that already passed:
 
 | The change                          | The block                                          |
 | ----------------------------------- | -------------------------------------------------- |
@@ -97,10 +92,9 @@ The hand-off tab copies the block's body and nothing else: a diff arrives on the
 bare patch, with no fences to strip. A preview under the list shows the highlighted block's
 first lines, so two similarly named paths are told apart before `enter`, and a `2/5` counter at
 the list's foot appears once a reply holds more than one block, so a list you have scrolled is
-not mistaken for the whole of it. The blocks are restored from the session entry written with
-the reply, so the tab survives `/reload` and a resumed session; it is empty only when that entry
-is missing or does not match the reply — one from before the install, or a message with no
-timestamp — and then the Agent reply tab is what is left. That tab lists what the message itself
+not mistaken for the whole of it. The blocks are read back out of the turn's tool results, so
+the tab survives `/reload` and a resumed session; it is empty when the turn handed nothing off,
+and then the Agent reply tab is what is left. That tab lists what the message itself
 is made of — each fenced block, table, list and quote, tagged with its kind and where it
 starts — and ends with the whole reply as one item, so there is always something to take. A
 fence tagged as anything but `md` — `diff`, `ts`, `bash`, or nothing at all — copies as the
@@ -117,11 +111,16 @@ fence and the blocks nested inside it arrive decorated exactly as the message ha
   "new file" when the path does not exist yet.
 - A `command` block is shell: read it, then run it.
 
+**The block on screen.** A block is a row, not message text, so nothing about it lands in the
+reply's prose. `ctrl+o` expands every row (and a left click expands one), showing the block
+itself — caption, fence and payload. Collapsed, the row is one line: `✓ copy_paste`, the caption,
+and the hint. The reply's own text is untouched: the model did not write the block, and the block
+is not written into what the model said.
+
 **The whole reply.** `/copy`, or `Ctrl+X` when nothing is selected in fullscreen mode, copies
-the last assistant message with its fences intact, so the fence handling is the applier's or
-yours. To strip it by hand, drop the leading fence and its tag line, the closing run of
-backticks, and the empty line the block leaves before that run — what remains is the body byte
-for byte, trailing newline included.
+the last assistant message — its prose, since a block is a row rather than message text. An
+expanded row is Markdown on a screen, so selecting it gives wrapped, indented text rather than
+the payload: read it there, but copy it with the picker.
 
 ## What a block guarantees
 
@@ -142,13 +141,14 @@ Node 22 (see `mise.toml`). `npm install`, then `npm test`, `npm run typecheck`, 
 
 ### Live verification
 
-`scripts/verify-live.sh` walks a human through the part a test cannot reach: install the
-extension in a real session, hand off a change, pick the block with the picker, and see that
-what lands on the clipboard is a patch git accepts and that the whole-reply path strips to the
-same bytes. It works in a scratch repository, so nothing under version control changes: the
-report it writes to `docs/verification/` is gitignored, and `.pi/settings.json` is untouched.
-Applying a block is the applier's business — that code lives in your dotfiles, not here — so it
-is out of scope. Re-run it whenever the picker, the hand-off section or the splice changes.
+`scripts/verify-live.sh` walks a human through the part a test cannot reach: start a session
+on this checkout, hand off a change, read the block in its row, expand it with `ctrl+o`, pick it
+with the picker, and see that what lands on the clipboard is a patch git accepts — and that the
+reply's own copy carries none of it. It works in a scratch repository, so nothing under version
+control changes: the report it writes to `docs/verification/` is gitignored, and
+`.pi/settings.json` is untouched. Applying a block is the applier's business — that code lives
+in your dotfiles, not here — so it is out of scope. Re-run it whenever the picker or the
+hand-off row changes.
 
 The wizard exits non-zero when a check it can make fails. Anything the run contradicted in
 `docs/handoff-contract.md` is not a check: the report is the record, and whether a guarantee
